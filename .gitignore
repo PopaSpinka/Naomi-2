@@ -15,6 +15,13 @@ __pycache__/
 .DS_Store
 **/.DS_Store
 
+# секреты (на всякий случай — токены/ключи никогда не коммитим)
+**/telegram.json
+*.env
+.env
+secrets*.json
+**/secrets*.json
+
 # прочее
 *.tmp
 node_modules/

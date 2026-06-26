@@ -14,6 +14,7 @@ from fastapi.staticfiles import StaticFiles
 
 import auth
 import oai
+import telegram
 
 # --- пути ---
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -29,7 +30,7 @@ HISTORY_FILE = os.path.join(DATA, "history.json")
 SESSION_FILE = os.path.join(DATA, "session.json")
 
 DEFAULT_SETTINGS = {"model": "gpt-5.5", "reasoning": "low"}
-VERSION = "naomi-0.1.1"
+VERSION = "naomi-0.2.0"
 
 app = FastAPI()
 
@@ -176,6 +177,13 @@ async def docs():
             return {"markdown": f.read()}
     except Exception:
         return {"markdown": ""}
+
+
+@app.on_event("startup")
+async def _start_telegram():
+    # если телеграм настроен (data/telegram.json) — поднимаем мост в фоне
+    if telegram.is_configured():
+        asyncio.create_task(telegram.run(build_instructions, load_settings))
 
 
 # статика фронта монтируется ПОСЛЕ /api/* — ловит всё остальное

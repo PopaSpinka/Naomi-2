@@ -29,7 +29,7 @@ SETTINGS_FILE = os.path.join(DATA, "settings.json")
 SESSION_FILE = os.path.join(DATA, "session.json")
 
 DEFAULT_SETTINGS = {"model": "gpt-5.5", "reasoning": "low"}
-VERSION = "naomi-0.3.1"
+VERSION = "naomi-0.3.2"
 
 app = FastAPI()
 
@@ -208,11 +208,22 @@ async def docs():
         return {"markdown": ""}
 
 
+_tg_task = None
+
+
 @app.on_event("startup")
 async def _start_telegram():
     # если телеграм настроен (data/telegram.json) — поднимаем мост в фоне
+    global _tg_task
     if telegram.is_configured():
-        asyncio.create_task(telegram.run(build_instructions, load_settings, CONVO, _convo_lock, sse_publish))
+        _tg_task = asyncio.create_task(telegram.run(build_instructions, load_settings, CONVO, _convo_lock, sse_publish))
+
+
+@app.on_event("shutdown")
+async def _stop_telegram():
+    # гасим поллер при остановке сервера, иначе он остаётся «осиротевшим» → двойные ответы
+    if _tg_task:
+        _tg_task.cancel()
 
 
 # статика фронта монтируется ПОСЛЕ /api/* — ловит всё остальное

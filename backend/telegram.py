@@ -56,7 +56,8 @@ async def run(get_instructions, get_settings, convo, lock, publish):
     timeout = httpx.Timeout(connect=10, read=40, write=20, pool=10)
     async with httpx.AsyncClient(timeout=timeout) as client:
         try:
-            await _api(client, token, "deleteWebhook", drop_pending_updates=True)
+            # сбрасываем только webhook; накопленные сообщения НЕ дропаем — ответим на них
+            await _api(client, token, "deleteWebhook", drop_pending_updates=False)
         except Exception:
             pass
         if allowed:

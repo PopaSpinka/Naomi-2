@@ -115,7 +115,7 @@ def _run_flow():
     with _lock:
         _flow.update(status="waiting", authorize_url=url, error=None)
 
-    result = {"code": None, "ok": False}
+    result = {"code": None, "ok": False, "error": None}
 
     class Handler(BaseHTTPRequestHandler):
         def log_message(self, *a):
@@ -129,6 +129,7 @@ def _run_flow():
                 return
             q = urllib.parse.parse_qs(parsed.query)
             if q.get("state", [""])[0] != state or q.get("error") or not q.get("code"):
+                result["error"] = q.get("error", ["неверный ответ авторизации"])[0]
                 self.send_response(400)
                 self.send_header("Content-Type", "text/html; charset=utf-8")
                 self.end_headers()
@@ -155,13 +156,13 @@ def _run_flow():
 
     httpd.timeout = 1
     deadline = time.time() + 300
-    while not result["ok"] and time.time() < deadline:
+    while not result["ok"] and not result["error"] and time.time() < deadline:
         httpd.handle_request()
     httpd.server_close()
 
     if not result["ok"]:
         with _lock:
-            _flow.update(status="error", error="истекло время ожидания входа")
+            _flow.update(status="error", error=result["error"] or "истекло время ожидания входа")
         return
 
     try:

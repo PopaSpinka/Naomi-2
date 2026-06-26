@@ -6,6 +6,7 @@
 Эндпоинт/тело/заголовки сняты с живого трафика codex-cli 0.142.2 и проверены вживую
 (HTTP 200, ~99 входных токенов). Логин по OAuth и выдача токена — в auth.py.
 """
+import asyncio
 import base64
 import json
 import os
@@ -132,9 +133,12 @@ def _to_input(messages: list[dict]) -> list[dict]:
 
 
 def _headers(tokens: dict, session_id: str) -> dict:
+    at, acc = tokens.get("access_token"), tokens.get("account_id")
+    if not at or not acc:
+        raise RuntimeError("not_logged_in")  # нет токена/аккаунта — нужен повторный вход
     return {
-        "Authorization": "Bearer " + tokens["access_token"],
-        "chatgpt-account-id": tokens["account_id"],
+        "Authorization": "Bearer " + at,
+        "chatgpt-account-id": acc,
         "OpenAI-Beta": "responses=experimental",
         "originator": "codex_cli_rs",
         "User-Agent": f"codex_cli_rs/{CLIENT_VERSION}",
@@ -160,14 +164,32 @@ def _body(messages, instructions, model, effort, verbosity, cache_key) -> dict:
     }
 
 
+# Один лок на обновление токена: refresh_token одноразовый, параллельные запросы
+# не должны гонять его одновременно (иначе второй получит invalid_grant).
+_refresh_lock = asyncio.Lock()
+
+
+async def _fresh_tokens(auth_path):
+    async with _refresh_lock:
+        return ensure_fresh(load_tokens(auth_path), auth_path)["tokens"]
+
+
+async def _refresh_after_401(auth_path, used_access_token):
+    async with _refresh_lock:
+        data = load_tokens(auth_path)
+        cur = data.get("tokens", {}).get("access_token")
+        if cur and cur != used_access_token:
+            return data["tokens"]  # уже обновлён другим запросом — берём новый
+        return refresh_tokens(data, auth_path)["tokens"]
+
+
 async def stream_chat(messages, *, instructions, model="gpt-5.5", effort="low",
                       verbosity="medium", cache_key=None, auth_path=AUTH_PATH):
     """Стримит ответ Наоми. Yield'ит кортежи ('delta', text) и в конце ('done', usage).
 
     cache_key — стабильный id диалога: одинаковый ключ держит префикс в кеше сервера
     (ниже латентность). Сессия → один ключ."""
-    data = ensure_fresh(load_tokens(auth_path), auth_path)
-    tokens = data["tokens"]
+    tokens = await _fresh_tokens(auth_path)
     session_id = str(uuid.uuid4())
     cache_key = cache_key or session_id
     body = _body(messages, instructions, model, effort, verbosity, cache_key)
@@ -176,10 +198,10 @@ async def stream_chat(messages, *, instructions, model="gpt-5.5", effort="low",
     async with httpx.AsyncClient(timeout=httpx.Timeout(connect=15, read=180, write=30, pool=15)) as client:
         async with client.stream("POST", RESPONSES_URL, json=body, headers=headers) as r:
             if r.status_code == 401:
-                # токен протух между проверкой и запросом — обновим и повторим один раз
+                # токен протух между проверкой и запросом — обновим (под локом) и повторим один раз
                 await r.aread()
-                data = refresh_tokens(load_tokens(auth_path), auth_path)
-                headers = _headers(data["tokens"], session_id)
+                tokens = await _refresh_after_401(auth_path, tokens["access_token"])
+                headers = _headers(tokens, session_id)
                 async with client.stream("POST", RESPONSES_URL, json=body, headers=headers) as r2:
                     r2.raise_for_status()
                     async for item in _parse_sse(r2):

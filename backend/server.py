@@ -29,7 +29,7 @@ HISTORY_FILE = os.path.join(DATA, "history.json")
 SESSION_FILE = os.path.join(DATA, "session.json")
 
 DEFAULT_SETTINGS = {"model": "gpt-5.5", "reasoning": "low"}
-VERSION = "naomi-0.1"
+VERSION = "naomi-0.1.1"
 
 app = FastAPI()
 
@@ -80,7 +80,10 @@ def cache_key() -> str:
 # ---------------------------------------------------------------- API
 @app.post("/api/chat")
 async def chat(req: Request):
-    payload = await req.json()
+    try:
+        payload = await req.json()
+    except Exception:
+        return JSONResponse({"error": "bad json"}, status_code=400)
     messages = [
         {"role": m.get("role", "user"), "content": m.get("content", "")}
         for m in payload.get("messages", [])
@@ -98,10 +101,14 @@ async def chat(req: Request):
             effort=cfg.get("reasoning", "low"),
             cache_key=cache_key(),
         )
-    except Exception as e:
-        return JSONResponse({"error": str(e)}, status_code=502)
+    except Exception:
+        # детали наружу не отдаём (могут утечь upstream-URL и пр.)
+        return JSONResponse({"error": "upstream error"}, status_code=502)
 
-    text = result["text"]
+    text = (result.get("text") or "").strip()
+    if not text:
+        # пустой ответ модели → фронт покажет «не получила ответ», пустой пузырь не создаём
+        return JSONResponse({"error": "empty reply"}, status_code=502)
     # сохраняем видимую историю для восстановления после перезагрузки страницы
     _write_json(HISTORY_FILE, {"messages": messages + [{"role": "assistant", "content": text}]})
     return {"reply": text, "thought": cfg.get("reasoning", "low") != "off", "usage": result.get("usage")}
@@ -119,7 +126,10 @@ async def get_settings():
 
 @app.post("/api/settings")
 async def set_settings(req: Request):
-    body = await req.json()
+    try:
+        body = await req.json()
+    except Exception:
+        return JSONResponse({"error": "bad json"}, status_code=400)
     cfg = load_settings()
     for k in ("model", "reasoning"):
         if k in body:

@@ -1,0 +1,20 @@
+# личные данные — история чата, кэш сессии, настройки
+backend/data/
+
+# python окружение и кэши
+backend/.venv/
+.venv/
+__pycache__/
+**/__pycache__/
+*.pyc
+
+# локальный конфиг запуска (содержит абсолютные пути и имя пользователя)
+.claude/launch.json
+
+# macOS
+.DS_Store
+**/.DS_Store
+
+# прочее
+*.tmp
+node_modules/

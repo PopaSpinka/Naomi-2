@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Naomi</title>
+
+  <!-- Шрифты (вместо вшитых woff2 — Google Fonts) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400..600;1,9..144,400..500&family=Geist:wght@300..600&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div id="root"></div>
+
+  <!-- React + ReactDOM: вшиты локально (vendor), без CDN и без браузерного Babel. -->
+  <script src="react.production.min.js"></script>
+  <script src="react-dom.production.min.js"></script>
+
+  <!-- Приложение: предсобранный JS (JSX→JS через esbuild, см. frontend/build.sh).
+       Порядок важен: сначала ui-kit, потом app. После правки .jsx — пересобрать. -->
+  <script src="ui-kit.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

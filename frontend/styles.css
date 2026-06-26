@@ -1,0 +1,1033 @@
+/* Naomi UI — стили. Извлечено из бандла, читается/правится как обычный CSS. */
+/* Тема по умолчанию — тёмная (голый :root ниже). Светлую включает body[data-theme="light"]
+   (app.jsx ставит data-theme на body). Раньше оба блока были голым :root — тёмный
+   всегда перебивал светлый, и тумблер темы не работал (rank 6 аудита). */
+body[data-theme="light"] {
+    --bg: #faf9f6;
+    --surface: #ffffff;
+    --bubble: #efeae0;
+    --bubble-hi: #f5f1e9;
+    --text: #1c1b17;
+    --muted: #6b685f;
+    --faint: #b4b0a4;
+    --divider: rgba(28, 27, 23, 0.08);
+    --accent: #c96442;
+    --accent-soft: rgba(201, 100, 66, 0.12);
+    --spin-accent: #c96442;
+    --spin-c: #c96442;
+    --spin-soft: rgba(201, 100, 66, 0.12);
+    --spin-blue: #3f9bff;
+    --spin-green: #4db678;
+    --spin-lilac: #9a6cf0;
+    --shadow: 0 1px 2px rgba(28, 27, 23, 0.04), 0 8px 24px rgba(28, 27, 23, 0.06);
+  }
+
+  :root {
+    --bg: #16150f;
+    --surface: #1f1e17;
+    --bubble: #2a281f;
+    --bubble-hi: #353327;
+    --text: #ece9df;
+    --muted: #9c9889;
+    --faint: #5a574c;
+    --divider: rgba(236, 233, 223, 0.09);
+    --accent: #e08562;
+    --accent-soft: rgba(224, 133, 98, 0.18);
+    --spin-accent: #e08562;
+    --spin-c: #e08562;
+    --spin-soft: rgba(224, 133, 98, 0.18);
+    --spin-blue: #62b4ff;
+    --spin-green: #6fd394;
+    --spin-lilac: #b28aff;
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 8px 24px rgba(0, 0, 0, 0.35);
+
+    /* Шрифты тема-независимы — держим их в общем :root, чтобы применялись ВСЕГДА.
+       Раньше они жили только в светлом блоке, и после разделения тем пропадали
+       в тёмной (дефолтной) теме — отсюда смена шрифта в UI. */
+    --font-sans: "Geist", ui-sans-serif, -apple-system, system-ui, sans-serif;
+    --font-serif: "Fraunces", ui-serif, Georgia, serif;
+    --font-mono: "Geist Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; height: 100%; background: var(--bg); color: var(--text); }
+  body {
+    font-family: var(--font-sans);
+    font-size: 15px;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    font-feature-settings: "ss01", "ss02", "cv11";
+  }
+
+  /* ─── App shell ─── */
+  .app {
+    display: grid;
+    grid-template-rows: auto 1fr;
+    height: 100dvh;
+    max-width: 760px;
+    margin: 0 auto;
+    position: relative;
+  }
+
+  /* ─── Header ─── */
+  .hdr {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 24px;
+    border-bottom: 1px solid var(--divider);
+    background: var(--bg);
+    backdrop-filter: blur(12px);
+    position: sticky;
+    top: 0;
+    z-index: 5;
+  }
+  .hdr-l { display: flex; align-items: center; gap: 12px; }
+  .hdr-mark {
+    width: 30px; height: 30px;
+    border-radius: 9px;
+    background: var(--accent);
+    color: white;
+    display: grid; place-items: center;
+    font-family: var(--font-serif);
+    font-weight: 500;
+    font-size: 17px;
+    letter-spacing: -0.02em;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.25), 0 1px 2px rgba(0,0,0,0.08);
+  }
+  .hdr-title {
+    font-size: 14px;
+    font-weight: 500;
+    letter-spacing: -0.01em;
+  }
+  .hdr-sub {
+    font-size: 12px;
+    color: var(--muted);
+    margin-top: 1px;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .hdr-dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: #4ca974;
+    box-shadow: 0 0 0 3px rgba(76, 169, 116, 0.18);
+  }
+  .hdr-r { display: flex; gap: 6px; }
+  .ghost-btn {
+    appearance: none; border: 0; background: transparent;
+    width: 34px; height: 34px; border-radius: 8px;
+    color: var(--muted); cursor: pointer;
+    display: grid; place-items: center;
+    transition: background 120ms, color 120ms;
+  }
+  .ghost-btn:hover { background: var(--divider); color: var(--text); }
+
+  /* ─── Theme toggle ─── */
+  .theme-toggle {
+    appearance: none;
+    border: 0;
+    background: transparent;
+    width: 34px;
+    height: 34px;
+    border-radius: 8px;
+    color: var(--muted);
+    cursor: pointer;
+    display: grid;
+    place-items: center;
+    transition: background 120ms, color 120ms, transform 300ms cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+  }
+  .theme-toggle:hover { background: var(--divider); color: var(--text); }
+  .theme-toggle svg {
+    width: 18px;
+    height: 18px;
+    transition: transform 400ms cubic-bezier(0.4, 0, 0.2, 1), opacity 200ms;
+  }
+  .theme-toggle:active svg { transform: rotate(30deg) scale(0.85); }
+
+
+  /* ─── Scroll area ─── */
+  .scroll {
+    overflow-y: auto;
+    overflow-x: hidden;
+    overscroll-behavior: contain;
+    scroll-behavior: smooth;
+    scrollbar-width: none;
+    overflow-anchor: none;
+  }
+  .scroll::-webkit-scrollbar { display: none; width: 0; height: 0; }
+
+  .conversation {
+    padding: 28px 24px 190px;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+  }
+
+  /* ─── Turn (user + assistant) ─── */
+  .turn {
+    display: flex;
+    flex-direction: column;
+    gap: 22px;
+    padding-bottom: 36px;
+  }
+  .turn + .turn { border-top: 1px solid transparent; }
+
+  /* ─── User bubble (right) ─── */
+  .row-user {
+    display: flex;
+    justify-content: flex-end;
+    animation: pop 240ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+  .bubble-user {
+    max-width: min(78%, 560px);
+    background: var(--bubble);
+    color: var(--text);
+    padding: 11px 16px;
+    border-radius: 18px 18px 4px 18px;
+    box-shadow: 0 1px 0 rgba(28,27,23,0.04);
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    font-size: 15px;
+    line-height: 1.5;
+  }
+
+  /* ─── Assistant response (left, no bubble) ─── */
+  .row-asst {
+    display: flex;
+    gap: 3px;
+    align-items: flex-start;
+    animation: fade 280ms ease-out;
+  }
+  .asst-avatar {
+    flex: 0 0 28px;
+    width: 28px; height: 28px;
+    margin-top: 2px;
+    border-radius: 8px;
+    background: var(--accent);
+    color: white;
+    display: grid; place-items: center;
+    font-family: var(--font-serif);
+    font-weight: 500;
+    font-size: 14px;
+    letter-spacing: -0.02em;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.25);
+  }
+  .asst-body {
+    flex: 1;
+    min-width: 0;
+    padding-top: 2px;
+    position: relative;   /* anchor for the gutter spinner */
+    color: var(--text);
+    font-size: 15.5px;
+    line-height: 1.62;
+  }
+  .asst-body p { margin: 0 0 0.85em; }
+  .asst-body p:last-child { margin-bottom: 0; }
+  .asst-body code {
+    font-family: var(--font-mono);
+    font-size: 0.88em;
+    background: var(--divider);
+    padding: 1.5px 6px;
+    border-radius: 4px;
+  }
+  /* Во время стриминга инлайн-код получает класс .word (display:inline-block), и его
+     вертикальный padding раздувает высоту строки; в финале код снова inline, строка
+     «схлопывается» → весь текст ниже прыгал на ~2px. Держим инлайн-код inline всегда —
+     fade-анимация (opacity/цвет) на нём всё равно работает, а высота строки не скачет. */
+  .asst-body code.word { display: inline; }
+  .asst-body strong { font-weight: 600; }
+
+  /* Плавное появление живого статуса этапа (в карточке задачи у поля ввода). */
+  @keyframes progress-in { from { opacity: 0; transform: translateY(3px); } to { opacity: 1; transform: none; } }
+
+  /* ─── Блок кода (```...```) ─── */
+  .code-block {
+    margin: 0 0 0.85em;
+    border: 1px solid var(--divider);
+    border-radius: 10px;
+    overflow: hidden;
+    background: rgba(127, 127, 140, 0.07);
+  }
+  .code-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 5px 12px;
+    border-bottom: 1px solid var(--divider);
+    background: rgba(127, 127, 140, 0.06);
+  }
+  .code-lang {
+    font-family: var(--font-mono);
+    font-size: 11.5px;
+    letter-spacing: 0.02em;
+    color: var(--text-3, #8a8a93);
+    text-transform: lowercase;
+  }
+  .code-copy {
+    appearance: none;
+    border: none;
+    background: transparent;
+    color: var(--text-3, #8a8a93);
+    font: inherit;
+    font-size: 11.5px;
+    cursor: pointer;
+    padding: 2px 4px;
+    border-radius: 4px;
+    transition: color 0.12s, background 0.12s;
+  }
+  .code-copy:hover { color: var(--text, #ece9e3); background: var(--divider); }
+  .code-block pre {
+    margin: 0;
+    padding: 12px 14px;
+    overflow-x: auto;
+  }
+  .code-block pre code {
+    font-family: var(--font-mono);
+    font-size: 12.5px;
+    line-height: 1.55;
+    background: none;
+    padding: 0;
+    border-radius: 0;
+    white-space: pre;
+    color: var(--text, #ece9e3);
+  }
+
+  /* ─── Streaming reveal ─── */
+  .word {
+    display: inline-block;
+    opacity: 0;
+    animation-duration: 420ms;
+    animation-timing-function: cubic-bezier(0.2, 0.7, 0.2, 1);
+    animation-fill-mode: both;
+  }
+  /* When animation ends, settle to plain rendering to avoid the
+     subpixel "settle" caused by the compositor layer that filter/transform
+     keeps alive. */
+  .word.done {
+    animation: none !important;
+    opacity: 1;
+    filter: none;
+    transform: none;
+    letter-spacing: normal;
+  }
+  .word.s-blur, [data-stream="blur"] .word {
+    animation-name: w-blur;
+    animation-duration: 280ms;
+    animation-timing-function: cubic-bezier(0.2, 0.7, 0.2, 1);
+  }
+  .word.s-rise, [data-stream="rise"] .word { animation-name: w-rise; animation-duration: 380ms; }
+  .word.s-glow, [data-stream="glow"] .word { animation-name: w-glow; animation-duration: 560ms; }
+  .word.s-fade, [data-stream="fade"] .word { animation-name: w-fade; animation-duration: 320ms; }
+
+  @keyframes w-tilt {
+    0%   { opacity: 0; transform: translateY(6px) rotate(-3deg); filter: blur(2px); }
+    100% { opacity: 1; transform: translateY(0) rotate(0); filter: blur(0); }
+  }
+  @keyframes w-bloom {
+    0%   { opacity: 0; transform: scale(0.4); }
+    60%  { opacity: 1; transform: scale(1.06); }
+    100% { opacity: 1; transform: scale(1); }
+  }
+  @keyframes w-letter-scan {
+    0%   { opacity: 0; letter-spacing: 0.4em; filter: blur(4px); }
+    100% { opacity: 1; letter-spacing: 0; filter: blur(0); }
+  }
+  [data-stream="tilt"] .word  { animation-name: w-tilt; animation-duration: 480ms; }
+  [data-stream="bloom"] .word { animation-name: w-bloom; animation-duration: 460ms; transform-origin: 50% 90%; }
+  [data-stream="scan"] .word  { animation-name: w-letter-scan; animation-duration: 520ms; }
+
+  @keyframes w-blur {
+    0%   { opacity: 0; filter: blur(2px); transform: translateY(1px); }
+    100% { opacity: 1; filter: blur(0); transform: translateY(0); }
+  }
+  @keyframes w-rise {
+    0%   { opacity: 0; transform: translateY(10px); }
+    100% { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes w-glow {
+    0%   { opacity: 0; color: var(--accent); text-shadow: 0 0 14px var(--accent-soft); }
+    35%  { opacity: 1; color: var(--accent); text-shadow: 0 0 10px var(--accent-soft); }
+    100% { opacity: 1; color: var(--text); text-shadow: none; }
+  }
+  @keyframes w-fade {
+    0%   { opacity: 0; }
+    100% { opacity: 1; }
+  }
+
+  @keyframes caret-blink {
+    0%, 50%   { opacity: 1; }
+    50.01%, 100% { opacity: 0.25; }
+  }
+  @keyframes caret-out {
+    to { opacity: 0; transform: scaleY(0.4); }
+  }
+  .caret {
+    display: inline-block;
+    width: 7px;
+    height: 1.05em;
+    margin-left: 2px;
+    vertical-align: -0.18em;
+    background: var(--accent);
+    border-radius: 2px;
+    transform-origin: bottom center;
+    animation: caret-blink 0.9s steps(1) infinite, caret-out 240ms ease-in forwards;
+    animation-delay: 0s, var(--caret-end, 1.6s);
+  }
+
+  /* ─── Thinking indicator ─── */
+  .asst-spinner-slot {
+    flex: 0 0 14px;
+    width: 14px;
+    padding-top: 6px;
+    display: flex;
+    align-items: flex-start;
+    --accent: var(--spin-c);
+    --accent-soft: var(--spin-soft);
+  }
+  .asst-spinner-slot .sp-fade {
+    opacity: 0;
+    transition: opacity 360ms ease;
+  }
+  .asst-spinner-slot.is-leaving .sp-fade {
+    opacity: 0;
+  }
+  .asst-spinner-slot.is-busy .sp-fade {
+    opacity: 1;
+  }
+  .asst-spinner-slot .sp-blink {
+    display: inline-flex;
+  }
+  .asst-spinner-slot.is-deep {
+    animation: spin-to-blue 600ms ease forwards;
+  }
+  /* Зелёный — когда агент отвечает БЕЗ размышления (reasoning off) и это не фоновая
+     задача. Жёлтый (accent по умолчанию) = размышляет; голубой (is-deep) = фон. */
+  .asst-spinner-slot.is-instant:not(.is-deep) {
+    --spin-c: var(--spin-green);
+  }
+  .asst-spinner-slot.is-busy.is-deep .sp-blink {
+    animation: spin-blink 1.15s ease-in-out infinite;
+  }
+  @property --spin-c {
+    syntax: "<color>";
+    inherits: true;
+    initial-value: #c96442;
+  }
+  @keyframes spin-to-blue {
+    from { --spin-c: var(--spin-accent); }
+    to   { --spin-c: var(--spin-blue); }
+  }
+  @keyframes spin-blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+  }
+  .thinking-label {
+    font-style: italic;
+    color: var(--muted);
+    letter-spacing: 0.005em;
+    animation: shimmer 1.4s ease-in-out infinite;
+  }
+
+  /* 1. Ring — original */
+  .sp-ring {
+    width: 16px; height: 16px;
+    border-radius: 50%;
+    border: 1.8px solid var(--divider);
+    border-top-color: var(--accent);
+    animation: spin 0.7s linear infinite;
+  }
+
+  /* 2. Dots — three bouncing */
+  .sp-dots { display: inline-flex; gap: 4px; align-items: center; height: 16px; }
+  .sp-dots i {
+    width: 5px; height: 5px; border-radius: 50%;
+    background: var(--accent);
+    animation: dot-bounce 1.1s ease-in-out infinite;
+  }
+  .sp-dots i:nth-child(2) { animation-delay: 0.14s; }
+  .sp-dots i:nth-child(3) { animation-delay: 0.28s; }
+  @keyframes dot-bounce {
+    0%, 80%, 100% { transform: translateY(0); opacity: 0.35; }
+    40% { transform: translateY(-4px); opacity: 1; }
+  }
+
+  /* 3. Pulse — breathing circle */
+  .sp-pulse {
+    width: 14px; height: 14px;
+    border-radius: 50%;
+    background: var(--accent);
+    animation: pulse-grow 1.2s ease-in-out infinite;
+  }
+  @keyframes pulse-grow {
+    0%, 100% { transform: scale(0.6); opacity: 0.5; }
+    50% { transform: scale(1); opacity: 1; }
+  }
+
+  /* 4. Bars — audio EQ */
+  .sp-bars { display: inline-flex; gap: 3px; align-items: center; height: 16px; }
+  .sp-bars i {
+    display: block;
+    width: 3px; height: 14px;
+    background: var(--accent);
+    border-radius: 2px;
+    transform-origin: center;
+    animation: bar-flex 1s ease-in-out infinite;
+  }
+  .sp-bars i:nth-child(1) { animation-delay: -0.4s; }
+  .sp-bars i:nth-child(2) { animation-delay: -0.25s; }
+  .sp-bars i:nth-child(3) { animation-delay: -0.1s; }
+  .sp-bars i:nth-child(4) { animation-delay: 0.05s; }
+  @keyframes bar-flex {
+    0%, 100% { transform: scaleY(0.35); opacity: 0.55; }
+    50% { transform: scaleY(1); opacity: 1; }
+  }
+
+  /* 5. Orbit — dot orbiting center */
+  .sp-orbit {
+    width: 18px; height: 18px;
+    position: relative;
+  }
+  .sp-orbit::before {
+    content: ""; position: absolute; inset: 0;
+    border-radius: 50%;
+    border: 1.2px dashed var(--divider);
+  }
+  .sp-orbit::after {
+    content: ""; position: absolute;
+    width: 5px; height: 5px; border-radius: 50%;
+    background: var(--accent);
+    top: -1px; left: 50%;
+    transform-origin: 0 10px;
+    animation: orbit 1.1s linear infinite;
+    margin-left: -2.5px;
+  }
+  @keyframes orbit {
+    to { transform: rotate(360deg); }
+  }
+
+  /* 6. Shimmer — text label only */
+  .sp-shimmer {
+    font-family: var(--font-serif);
+    font-style: italic;
+    font-size: 14.5px;
+    background: linear-gradient(
+      90deg,
+      var(--faint) 0%,
+      var(--text) 45%,
+      var(--text) 55%,
+      var(--faint) 100%
+    );
+    background-size: 220% 100%;
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    animation: shimmer-slide 2.2s linear infinite;
+  }
+  @keyframes shimmer-slide {
+    0% { background-position: 220% 0; }
+    100% { background-position: -120% 0; }
+  }
+
+  /* 7. Wave — 5 dots sine wave */
+  .sp-wave { display: inline-flex; gap: 3px; align-items: center; height: 18px; }
+  .sp-wave i {
+    width: 4px; height: 4px; border-radius: 50%;
+    background: var(--accent);
+    animation: wave-up 1.2s ease-in-out infinite;
+  }
+  .sp-wave i:nth-child(1) { animation-delay: 0s; }
+  .sp-wave i:nth-child(2) { animation-delay: 0.1s; }
+  .sp-wave i:nth-child(3) { animation-delay: 0.2s; }
+  .sp-wave i:nth-child(4) { animation-delay: 0.3s; }
+  .sp-wave i:nth-child(5) { animation-delay: 0.4s; }
+  @keyframes wave-up {
+    0%, 60%, 100% { transform: translateY(0) scale(0.7); opacity: 0.45; }
+    30% { transform: translateY(-5px) scale(1); opacity: 1; }
+  }
+
+  /* 8. Morph — rotating squircle */
+  .sp-morph {
+    width: 16px; height: 16px;
+    background: var(--accent);
+    animation: morph-spin 2.4s ease-in-out infinite;
+  }
+  @keyframes morph-spin {
+    0%   { border-radius: 35%;        transform: rotate(0deg); }
+    25%  { border-radius: 50% 20% 50% 20%; transform: rotate(90deg); }
+    50%  { border-radius: 50%;        transform: rotate(180deg); }
+    75%  { border-radius: 20% 50% 20% 50%; transform: rotate(270deg); }
+    100% { border-radius: 35%;        transform: rotate(360deg); }
+  }
+
+  /* 9. Breath — soft glowing circle */
+  .sp-breath {
+    width: 12px; height: 12px;
+    border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 0 0 var(--accent-soft);
+    animation: breath-glow 1.6s ease-in-out infinite;
+  }
+  @keyframes breath-glow {
+    0%, 100% { box-shadow: 0 0 0 0 var(--accent-soft); transform: scale(0.85); }
+    50%      { box-shadow: 0 0 0 8px transparent;       transform: scale(1.05); }
+  }
+
+  /* 10. Dual — two opposing arcs */
+  .sp-dual {
+    width: 18px; height: 18px;
+    position: relative;
+  }
+  .sp-dual::before, .sp-dual::after {
+    content: ""; position: absolute; inset: 0;
+    border-radius: 50%;
+    border: 1.5px solid transparent;
+  }
+  .sp-dual::before {
+    border-top-color: var(--accent);
+    border-right-color: var(--accent);
+    animation: spin 0.9s cubic-bezier(0.6, 0.1, 0.4, 0.9) infinite;
+  }
+  .sp-dual::after {
+    inset: 4px;
+    border-bottom-color: var(--accent);
+    border-left-color: var(--accent);
+    opacity: 0.55;
+    animation: spin 0.9s cubic-bezier(0.6, 0.1, 0.4, 0.9) infinite reverse;
+  }
+
+  /* 11. Pillar — vertical bar, smooth pulse */
+  .sp-pillar {
+    display: inline-block;
+    width: 4px;
+    height: 18px;
+    border-radius: 2px;
+    background: var(--accent);
+    animation: pillar-pulse 1.4s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+    transform-origin: center;
+  }
+  @keyframes pillar-pulse {
+    0%, 100% { transform: scaleY(0.55); opacity: 0.45; }
+    50%      { transform: scaleY(1);    opacity: 1;    }
+  }
+
+  /* ─── Composer ─── */
+  /* The composer FLOATS over the chat: its growth never resizes the scroll
+     area, so typing a 2nd line cannot shift the conversation. The chat keeps
+     a constant bottom padding (.conversation) to stay clear of it. */
+  .composer-wrap {
+    padding: 12px 24px 20px;
+    background: linear-gradient(to bottom, transparent, var(--bg) 28%);
+    position: absolute;
+    left: 0; right: 0; bottom: 0;
+  }
+  .composer {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: end;
+    gap: 8px;
+    background: var(--surface);
+    border: 1px solid var(--divider);
+    border-radius: 22px;
+    padding: 8px 8px 8px 18px;
+    box-shadow: var(--shadow);
+    transition: border-color 140ms, box-shadow 140ms;
+  }
+  .composer textarea {
+    appearance: none;
+    border: 0;
+    outline: 0;
+    background: transparent;
+    resize: none;
+    width: 100%;
+    font-family: inherit;
+    font-size: 15px;
+    line-height: 1.5;
+    color: var(--text);
+    padding: 8px 0;
+    max-height: 120px;
+    min-height: 24px;
+    scrollbar-width: none;
+  }
+  .composer textarea::-webkit-scrollbar { display: none; width: 0; height: 0; }
+  .composer textarea::placeholder { color: var(--faint); }
+  .send-btn {
+    appearance: none;
+    border: 0;
+    width: 36px; height: 36px;
+    border-radius: 50%;
+    background: #605e57;
+    color: var(--bg);
+    cursor: pointer;
+    display: grid; place-items: center;
+    transition: background 120ms, transform 120ms, opacity 120ms;
+    flex-shrink: 0;
+  }
+  .send-btn:hover:not(:disabled) { transform: translateY(-1px); }
+  .send-btn:disabled {
+    background: var(--divider);
+    color: var(--faint);
+    cursor: not-allowed;
+  }
+  .send-btn svg { width: 16px; height: 16px; }
+
+  .composer-hint {
+    text-align: center;
+    color: var(--faint);
+    font-size: 11.5px;
+    margin-top: 8px;
+    letter-spacing: 0.01em;
+  }
+  .composer-hint kbd {
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    background: var(--divider);
+    padding: 1px 5px;
+    border-radius: 3px;
+    margin: 0 2px;
+  }
+
+  /* ─── Animations ─── */
+  @keyframes pop {
+    from { transform: translateY(8px) scale(0.98); opacity: 0; }
+    to { transform: translateY(0) scale(1); opacity: 1; }
+  }
+  @keyframes fade {
+    from { opacity: 0; transform: translateY(4px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
+  @keyframes shimmer {
+    0%, 100% { opacity: 0.45; }
+    50% { opacity: 1; }
+  }
+  .thinking-label { animation: shimmer 1.4s ease-in-out infinite; }
+  /* Живая замена предответа: текст плавно растворяется (как дымка), затем на его
+     месте финальный ответ проявляется обычной пословной анимацией потока. */
+  .asst-body { transition: opacity 360ms ease, filter 360ms ease; }
+  .asst-body.is-erasing { opacity: 0; filter: blur(5px); }
+  .md-table { border-collapse: collapse; margin: 0 0 0.85em; width: 100%; font-size: 0.96em; }
+  .md-table th, .md-table td { border: 1px solid rgba(255,255,255,0.14); padding: 6px 11px; text-align: left; vertical-align: top; }
+  .md-table th { font-weight: 600; background: rgba(255,255,255,0.05); }
+  .md-table tbody tr:nth-child(even) td { background: rgba(255,255,255,0.02); }
+
+  /* density variants */
+  [data-density="compact"] .turn { gap: 14px; padding-bottom: 22px; }
+  [data-density="compact"] .conversation { padding: 20px 24px 0; }
+  [data-density="compact"] .asst-body { font-size: 14.5px; line-height: 1.55; }
+  [data-density="compact"] .bubble-user { font-size: 14px; padding: 9px 14px; }
+
+  [data-density="comfy"] .turn { gap: 28px; padding-bottom: 48px; }
+  [data-density="comfy"] .conversation { padding: 36px 28px 0; }
+
+  @media (max-width: 640px) {
+    .hdr { padding: 12px 16px; }
+    .conversation { padding: 20px 16px 0; }
+    .composer-wrap { padding: 8px 16px 16px; }
+    .bubble-user { max-width: 86%; }
+  }
+
+/* Version badge — agent version + last pushed commit, bottom-right corner */
+.ver-badge {
+  position: fixed;
+  right: 12px;
+  bottom: 8px;
+  z-index: 60;
+  font-family: "Geist Mono", ui-monospace, monospace;
+  font-size: 10.5px;
+  letter-spacing: 0.02em;
+  opacity: 0.45;
+  pointer-events: none;
+  user-select: none;
+}
+
+
+/* Clickable links in assistant messages */
+.asst-body a.msg-link { color: var(--accent, #6ea8ff); text-decoration: underline; text-underline-offset: 2px; }
+.asst-body a.msg-link:hover { opacity: 0.85; }
+
+/* Активная фоновая задача — карточка НАД полем ввода, слева: название + живой статус. */
+.task-cards {
+  display: flex;
+  flex-direction: row;     /* в РЯД слева направо, а не колонкой друг над другом */
+  flex-wrap: wrap;         /* не влезли в строку — переносятся на следующую */
+  align-items: flex-start;
+  gap: 6px;
+  margin: 0 0 8px 2px;
+}
+.task-card {
+  animation: chip-in 0.28s ease;
+  min-width: 230px;
+  max-width: min(440px, 88%);
+  padding: 8px 12px 9px;
+  border: 1px solid var(--divider);
+  border-radius: 14px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+.task-card-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.task-card-head .task-label {
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--text);
+  max-width: 360px;
+}
+.task-card-head .task-x { margin-left: auto; }
+.task-status {
+  margin-top: 3px;
+  padding-left: 15px;          /* под текст названия, мимо точки */
+  font-size: 12.5px;
+  color: var(--faint);
+  font-style: italic;
+  animation: progress-in 0.3s ease;
+}
+.task-dot {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--accent, #6ea8ff);
+  flex: none;
+  animation: job-pulse 1.6s ease-in-out infinite;
+}
+.task-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 200px;
+}
+.task-x {
+  border: none; background: transparent; color: inherit;
+  font-size: 11px; cursor: pointer; opacity: 0.6; padding: 0 2px;
+}
+.task-x:hover { opacity: 1; }
+
+/* Caption linking a finished result to its original request */
+.task-ref {
+  font-size: 12px;
+  font-style: italic;
+  color: var(--text-3, #8a8a93);
+  margin-bottom: 6px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+@keyframes job-pulse { 0%, 100% { opacity: 0.5; } 50% { opacity: 0.95; } }
+
+@keyframes chip-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* API keys tab */
+.set-input {
+  background: var(--bg-2, rgba(128,128,140,0.08));
+  border: 1px solid var(--border, rgba(128,128,140,0.3));
+  border-radius: 8px;
+  color: inherit;
+  font-size: 13px;
+  padding: 6px 10px;
+  width: 200px;
+}
+.set-input:focus { outline: none; border-color: var(--accent, #6ea8ff); }
+.key-dot {
+  display: inline-block;
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: rgba(128,128,140,0.5);
+  margin: 0 6px 0 8px;
+}
+.key-dot.on { background: #46c46f; }
+.key-dot.bad { background: #e5534b; }
+.key-dot.warn { background: #d8a657; }
+.key-state { font-size: 12px; color: var(--text-3, #8a8a93); font-weight: 400; }
+.set-link { color: var(--accent, #6ea8ff); text-decoration: none; }
+.set-link:hover { text-decoration: underline; }
+.set-btn[disabled] { opacity: 0.5; cursor: default; }
+
+/* Memory file editor */
+.mem-edit {
+  width: 100%;
+  box-sizing: border-box;
+  background: var(--bg-2, rgba(128,128,140,0.08));
+  border: 1px solid var(--border, rgba(128,128,140,0.3));
+  border-radius: 8px;
+  color: inherit;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  line-height: 1.5;
+  padding: 10px;
+  resize: vertical;
+}
+.mem-edit:focus { outline: none; border-color: var(--accent, #6ea8ff); }
+
+/* Memory file expand chevron — compact, borderless */
+.mem-chev {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  flex: none;
+  color: var(--text-3, #8a8a93);
+  opacity: 0.55;
+  transition: transform 0.22s ease, opacity 0.15s ease, color 0.15s ease;
+}
+.mem-row:hover .mem-chev { opacity: 1; }
+.mem-chev.open {
+  transform: rotate(180deg);
+  color: var(--accent, #6ea8ff);
+  opacity: 1;
+}
+
+/* Naomi tab: calendar */
+.cal-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 0;
+  font-size: 13px;
+  border-bottom: 1px solid var(--border, rgba(128,128,140,0.15));
+}
+.cal-date { font-family: ui-monospace, Menlo, monospace; font-size: 12px; color: var(--text-3, #8a8a93); flex: none; }
+.cal-title { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cal-tag {
+  font-size: 10.5px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  border: 1px solid var(--border, rgba(128,128,140,0.3));
+  color: var(--text-3, #8a8a93);
+  flex: none;
+}
+.cal-tag.hot { color: var(--accent, #6ea8ff); border-color: var(--accent, #6ea8ff); }
+.cal-add { display: flex; align-items: center; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+.cal-yearly { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; color: var(--text-3, #8a8a93); }
+
+/* Scrollbars: subtle, in-theme instead of the system white */
+* { scrollbar-width: thin; scrollbar-color: rgba(128,128,140,0.3) transparent; }
+*::-webkit-scrollbar { width: 9px; height: 9px; }
+*::-webkit-scrollbar-track { background: transparent; }
+*::-webkit-scrollbar-thumb {
+  background: rgba(128,128,140,0.28);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+*::-webkit-scrollbar-thumb:hover { background-color: rgba(128,128,140,0.5); background-clip: padding-box; }
+*::-webkit-scrollbar-corner { background: transparent; }
+
+/* Reports tab */
+.rep-status {
+  font-size: 10.5px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--border, rgba(128,128,140,0.3));
+  color: var(--text-3, #8a8a93);
+  margin-left: 8px;
+  vertical-align: 1px;
+}
+.rep-status.open { color: #e0a046; border-color: #e0a046; }
+.rep-body {
+  margin: 8px 0 10px;
+  padding: 12px 14px;
+  border: 1px solid var(--border, rgba(128,128,140,0.2));
+  border-radius: 10px;
+  background: var(--bg-2, rgba(128,128,140,0.05));
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 14px;
+  color: #ece9e3;
+}
+.rep-toggle {
+  background: none;
+  border: none;
+  color: #9a978f;
+  font-size: 12px;
+  cursor: pointer;
+  padding: 2px 0;
+  font-family: inherit;
+}
+.rep-toggle:hover { color: #ece9e3; }
+.rep-ctx {
+  margin: 8px 0 2px;
+  padding: 10px 12px;
+  border: 1px solid rgba(255,255,255,0.07);
+  border-radius: 9px;
+  background: rgba(0,0,0,0.18);
+}
+.rep-ctx-line {
+  margin: 0 0 5px;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: #c9c6bf;
+  word-break: break-word;
+}
+.rep-ctx-role {
+  display: inline-block;
+  min-width: 64px;
+  color: #8a8a93;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.rep-ctx-raw {
+  margin: 10px 0 0;
+  padding: 9px 10px;
+  border-radius: 7px;
+  background: rgba(0,0,0,0.3);
+  color: #9a978f;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+/* Тост-подтверждение репорта — поверх композера, ненавязчиво, кликабельно. */
+.rep-toast {
+  position: fixed;
+  left: 50%;
+  bottom: 96px;
+  transform: translateX(-50%);
+  z-index: 1000;
+  max-width: min(520px, 92vw);
+  padding: 11px 16px;
+  border-radius: 12px;
+  background: #26261f;
+  border: 1px solid rgba(255,255,255,0.1);
+  box-shadow: 0 12px 40px rgba(0,0,0,0.45);
+  cursor: pointer;
+  animation: reptoast .2s ease;
+}
+@keyframes reptoast { from { opacity: 0; transform: translate(-50%, 8px); } to { opacity: 1; transform: translate(-50%, 0); } }
+.rep-toast:hover { background: #2f2f26; }
+.rep-toast-title { font-size: 13.5px; font-weight: 600; color: #ece9e3; display: flex; align-items: center; gap: 7px; }
+.rep-toast-dot { font-size: 13px; }
+.rep-toast-body { margin-top: 4px; font-size: 13px; color: #b6b3aa; line-height: 1.45; }
+
+/* Бейдж версии (git HEAD) — внизу справа, ненавязчиво, моноширинно.
+   Обновляется при naomi-restart (сервер перечитывает HEAD на старте). */
+.version-badge {
+  position: fixed;
+  right: 10px;
+  bottom: 7px;
+  z-index: 20;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1;
+  letter-spacing: 0.02em;
+  color: var(--muted);
+  opacity: 0.45;
+  padding: 3px 6px;
+  border-radius: 6px;
+  user-select: all;
+  transition: opacity 0.15s ease, background 0.15s ease;
+}
+.version-badge::before { content: "v"; opacity: 0.55; }
+.version-badge:hover { opacity: 0.95; background: var(--divider, rgba(128,128,140,0.12)); }

@@ -26,11 +26,10 @@ os.makedirs(DATA, exist_ok=True)
 NAOMI_MD = os.path.join(ROOT, "naomi.md")
 PRAVILA_MD = os.path.join(ROOT, "pravila.md")
 SETTINGS_FILE = os.path.join(DATA, "settings.json")
-HISTORY_FILE = os.path.join(DATA, "history.json")
 SESSION_FILE = os.path.join(DATA, "session.json")
 
 DEFAULT_SETTINGS = {"model": "gpt-5.5", "reasoning": "low"}
-VERSION = "naomi-0.2.0"
+VERSION = "naomi-0.3.0"
 
 app = FastAPI()
 
@@ -78,6 +77,23 @@ def cache_key() -> str:
     return s["cache_key"]
 
 
+# ---------------------------------------------------------------- единый тред + SSE
+# Один диалог для веба и телеграма. В ПАМЯТИ → сбрасывается при перезапуске сервера.
+CONVO = []
+_convo_lock = asyncio.Lock()
+_sse_clients = set()  # set[asyncio.Queue]: подключённые веб-клиенты /api/events
+
+
+async def sse_publish(event: dict):
+    """Рассылает событие всем веб-клиентам (live-зеркало телеграма в веб)."""
+    data = json.dumps(event, ensure_ascii=False)
+    for q in list(_sse_clients):
+        try:
+            q.put_nowait(data)
+        except Exception:
+            pass
+
+
 # ---------------------------------------------------------------- API
 @app.post("/api/chat")
 async def chat(req: Request):
@@ -85,39 +101,42 @@ async def chat(req: Request):
         payload = await req.json()
     except Exception:
         return JSONResponse({"error": "bad json"}, status_code=400)
-    messages = [
-        {"role": m.get("role", "user"), "content": m.get("content", "")}
-        for m in payload.get("messages", [])
-        if m.get("role") in ("user", "assistant")
-    ]
-    if not messages:
+    # сервер ведёт единый тред (CONVO); от клиента берём только новую реплику
+    user_text = ""
+    for m in reversed(payload.get("messages", [])):
+        if m.get("role") == "user" and (m.get("content") or "").strip():
+            user_text = m["content"]
+            break
+    if not user_text:
         return JSONResponse({"error": "no messages"}, status_code=400)
 
     cfg = load_settings()
-    try:
-        result = await oai.complete(
-            messages,
-            instructions=build_instructions(),
-            model=cfg.get("model", "gpt-5.5"),
-            effort=cfg.get("reasoning", "low"),
-            cache_key=cache_key(),
-        )
-    except Exception:
-        # детали наружу не отдаём (могут утечь upstream-URL и пр.)
-        return JSONResponse({"error": "upstream error"}, status_code=502)
-
-    text = (result.get("text") or "").strip()
-    if not text:
-        # пустой ответ модели → фронт покажет «не получила ответ», пустой пузырь не создаём
-        return JSONResponse({"error": "empty reply"}, status_code=502)
-    # сохраняем видимую историю для восстановления после перезагрузки страницы
-    _write_json(HISTORY_FILE, {"messages": messages + [{"role": "assistant", "content": text}]})
+    async with _convo_lock:
+        CONVO.append({"role": "user", "content": user_text})
+        try:
+            result = await oai.complete(
+                CONVO,
+                instructions=build_instructions(),
+                model=cfg.get("model", "gpt-5.5"),
+                effort=cfg.get("reasoning", "low"),
+                cache_key=cache_key(),
+            )
+            text = (result.get("text") or "").strip()
+        except Exception:
+            CONVO.pop()  # откатываем неотвеченную реплику
+            return JSONResponse({"error": "upstream error"}, status_code=502)
+        if not text:
+            CONVO.pop()
+            return JSONResponse({"error": "empty reply"}, status_code=502)
+        CONVO.append({"role": "assistant", "content": text})
+    # веб НЕ зеркалим в телеграм и не публикуем в SSE (клиент уже показал у себя)
     return {"reply": text, "thought": cfg.get("reasoning", "low") != "off", "usage": result.get("usage")}
 
 
 @app.get("/api/history")
 async def history():
-    return _read_json(HISTORY_FILE, {"messages": []})
+    # единый тред из памяти (после рестарта сервера — пусто)
+    return {"messages": CONVO}
 
 
 @app.get("/api/settings")
@@ -160,12 +179,22 @@ async def auth_login():
 
 @app.get("/api/events")
 async def events():
-    """SSE-keepalive: фронт держит EventSource открытым. Пока шлём только пинги."""
+    """SSE: keepalive + live-зеркало телеграм-сообщений в веб (события 'incoming')."""
+    q = asyncio.Queue()
+    _sse_clients.add(q)
+
     async def gen():
-        yield ": connected\n\n"
-        while True:
-            await asyncio.sleep(20)
-            yield ": ping\n\n"
+        try:
+            yield ": connected\n\n"
+            while True:
+                try:
+                    data = await asyncio.wait_for(q.get(), timeout=20)
+                    yield "data: " + data + "\n\n"
+                except asyncio.TimeoutError:
+                    yield ": ping\n\n"
+        finally:
+            _sse_clients.discard(q)
+
     return StreamingResponse(gen(), media_type="text/event-stream")
 
 
@@ -183,7 +212,7 @@ async def docs():
 async def _start_telegram():
     # если телеграм настроен (data/telegram.json) — поднимаем мост в фоне
     if telegram.is_configured():
-        asyncio.create_task(telegram.run(build_instructions, load_settings))
+        asyncio.create_task(telegram.run(build_instructions, load_settings, CONVO, _convo_lock, sse_publish))
 
 
 # статика фронта монтируется ПОСЛЕ /api/* — ловит всё остальное

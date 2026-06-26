@@ -13,7 +13,6 @@ import oai
 
 CFG_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "telegram.json")
 API = "https://api.telegram.org/bot{token}/{method}"
-HISTORY_MAX = 20
 MSG_LIMIT = 4000
 
 
@@ -42,14 +41,17 @@ async def _send(client, token, chat_id, text):
         await _api(client, token, "sendMessage", chat_id=chat_id, text=text[i:i + MSG_LIMIT])
 
 
-async def run(get_instructions, get_settings):
-    """Запускается из server.py на старте, если телеграм настроен."""
+async def run(get_instructions, get_settings, convo, lock, publish):
+    """Запускается из server.py на старте.
+
+    convo  — общий тред (список) веба и телеграма; lock — сериализует ход;
+    publish(event) — отправляет событие в веб через SSE (зеркало телеграма в веб).
+    """
     cfg = load_cfg()
     if not cfg or not cfg.get("token"):
         return
     token = cfg["token"]
     allowed = str(cfg.get("chat_id", "")).strip()
-    history = []
 
     timeout = httpx.Timeout(connect=10, read=40, write=20, pool=10)
     async with httpx.AsyncClient(timeout=timeout) as client:
@@ -79,27 +81,27 @@ async def run(get_instructions, get_settings):
                     if not text:
                         continue
 
-                    history.append({"role": "user", "content": text})
-                    del history[:-HISTORY_MAX]
                     try:
                         await _api(client, token, "sendChatAction", chat_id=chat_id, action="typing")
                     except Exception:
                         pass
 
                     s = get_settings()
-                    try:
-                        result = await oai.complete(
-                            history,
-                            instructions=get_instructions(),
-                            model=s.get("model", "gpt-5.5"),
-                            effort=s.get("reasoning", "low"),
-                        )
-                        reply = (result.get("text") or "").strip() or "…"
-                        history.append({"role": "assistant", "content": reply})
-                        del history[:-HISTORY_MAX]
-                    except Exception:
-                        reply = "Ой, что-то пошло не так — попробуй ещё раз 🤍"
-                        history.pop()  # не запоминаем неотвеченную реплику
+                    async with lock:
+                        convo.append({"role": "user", "content": text})
+                        await publish({"type": "incoming", "role": "user", "content": text})   # реплика → в веб live
+                        try:
+                            result = await oai.complete(
+                                convo,
+                                instructions=get_instructions(),
+                                model=s.get("model", "gpt-5.5"),
+                                effort=s.get("reasoning", "low"),
+                            )
+                            reply = (result.get("text") or "").strip() or "…"
+                        except Exception:
+                            reply = "Ой, что-то пошло не так — попробуй ещё раз 🤍"
+                        convo.append({"role": "assistant", "content": reply})
+                        await publish({"type": "incoming", "role": "assistant", "content": reply})  # ответ → в веб live
                     await _send(client, token, chat_id, reply)
             except Exception:
                 await asyncio.sleep(3)  # сетевой сбой/таймаут — подождём и продолжим

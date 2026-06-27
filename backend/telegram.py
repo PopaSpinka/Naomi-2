@@ -12,9 +12,17 @@ import httpx
 import oai
 import search
 
+# Наоми пишет обычным markdown (**жирный**, списки, `код`), а у Телеграма свой
+# диалог — MarkdownV2 со строгим экранированием. Конвертируем перед отправкой.
+try:
+    import telegramify_markdown
+except Exception:
+    telegramify_markdown = None
+
 CFG_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "telegram.json")
 API = "https://api.telegram.org/bot{token}/{method}"
-MSG_LIMIT = 4000
+MSG_LIMIT = 4096          # жёсткий потолок сообщения Телеграма
+SOURCE_LIMIT = 3500       # режем ИСХОДНИК с запасом — экранирование MarkdownV2 удлиняет текст
 
 
 def load_cfg():
@@ -35,11 +43,49 @@ async def _api(client, token, method, **params):
     return r.json()
 
 
+def _to_mdv2(text):
+    """markdown Наоми → MarkdownV2 Телеграма. None — если конвертер недоступен/упал."""
+    if not telegramify_markdown:
+        return None
+    try:
+        return telegramify_markdown.markdownify(text)
+    except Exception:
+        return None
+
+
+def _chunks(text, limit):
+    """Бьём текст на части <= limit, по возможности по границам строк (не рвём слова)."""
+    if len(text) <= limit:
+        return [text]
+    out, cur = [], ""
+    for line in text.split("\n"):
+        if len(line) > limit:                       # одна строка длиннее лимита — режем жёстко
+            if cur:
+                out.append(cur); cur = ""
+            for i in range(0, len(line), limit):
+                out.append(line[i:i + limit])
+        elif len(cur) + len(line) + 1 > limit:
+            out.append(cur); cur = line
+        else:
+            cur = (cur + "\n" + line) if cur else line
+    if cur:
+        out.append(cur)
+    return out
+
+
 async def _send(client, token, chat_id, text):
-    # Телеграм режет длинные сообщения — бьём на куски.
+    """Шлём ответ с форматированием (MarkdownV2). Если разметка не зашла — повторяем
+    тем же текстом без parse_mode, чтобы сообщение точно дошло (форматирование важнее
+    не делать, чем уронить ответ). Длинное бьём на куски по границам строк."""
     text = text or "…"
-    for i in range(0, len(text), MSG_LIMIT):
-        await _api(client, token, "sendMessage", chat_id=chat_id, text=text[i:i + MSG_LIMIT])
+    for chunk in _chunks(text, SOURCE_LIMIT):
+        md = _to_mdv2(chunk)
+        ok = False
+        if md and len(md) <= MSG_LIMIT:
+            r = await _api(client, token, "sendMessage", chat_id=chat_id, text=md, parse_mode="MarkdownV2")
+            ok = bool(r.get("ok"))
+        if not ok:
+            await _api(client, token, "sendMessage", chat_id=chat_id, text=chunk[:MSG_LIMIT])
 
 
 async def run(get_instructions, get_settings, convo, lock, publish):

@@ -1092,3 +1092,5 @@ body[data-theme="light"] {
 .home-step b { min-width: 50px; text-align: center; font-size: 13.5px; color: #ece9e3; font-variant-numeric: tabular-nums; font-weight: 600; }
 .home-cycle { background: #222220; border: 1px solid rgba(255,255,255,.1); color: #ece9e3; font: inherit; font-size: 12.5px; padding: 5px 11px; border-radius: 8px; cursor: pointer; transition: background .12s; }
 .home-cycle:hover { background: #2e2e2a; }
+.home-head-t { display: inline-flex; align-items: center; gap: 9px; }
+.home-head-t svg { opacity: .9; flex: 0 0 auto; }

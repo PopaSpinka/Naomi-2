@@ -554,7 +554,7 @@ function setDel(setter, id) {
 const HP_ROOMS = [{ v: "гостиная", label: "гостиная" }, { v: "кухня", label: "кухня" }, { v: "спальня", label: "спальня" }];
 const HP_AC_MODES = [{ v: "cool", label: "охлаждение" }, { v: "heat", label: "обогрев" }, { v: "fan", label: "вентиляция" }, { v: "dry", label: "осушение" }, { v: "auto", label: "авто" }];
 const HP_FANS = [{ v: "auto", label: "авто" }, { v: "low", label: "низ" }, { v: "mid", label: "сред" }, { v: "high", label: "выс" }];
-const HP_CONDS = [{ v: "ясно", label: "☀ ясно" }, { v: "облачно", label: "⛅ облачно" }, { v: "пасмурно", label: "☁ пасмурно" }, { v: "дождь", label: "🌧 дождь" }, { v: "гроза", label: "⛈ гроза" }, { v: "снег", label: "❄ снег" }, { v: "туман", label: "🌫 туман" }];
+const HP_CONDS = [{ v: "ясно", label: "ясно" }, { v: "облачно", label: "облачно" }, { v: "пасмурно", label: "пасмурно" }, { v: "дождь", label: "дождь" }, { v: "гроза", label: "гроза" }, { v: "снег", label: "снег" }, { v: "туман", label: "туман" }];
 const HP_VAC = [{ v: "vacuum", label: "пылесосит" }, { v: "mop", label: "моет" }];
 const cap = (s) => (s ? s[0].toUpperCase() + s.slice(1) : s);
 
@@ -590,7 +590,7 @@ function HomePanel({ open, home, onPatch, onClose }) {
   const people = h.people || {}, ac = h.ac || {}, weather = h.weather || {}, indoor = h.indoor || {}, vac = h.vacuum || {}, toilet = h.toilet || {};
   return (
     <aside className={"home-panel" + (open ? " open" : "")} aria-hidden={!open}>
-      <div className="home-head"><span>🏠 Умный дом</span><button className="home-x" onClick={onClose} aria-label="Закрыть">✕</button></div>
+      <div className="home-head"><span className="home-head-t"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M3 10.5L12 3l9 7.5"></path><path d="M5 9.5V20a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V9.5"></path><path d="M9.5 21v-6h5v6"></path></svg>Умный дом</span><button className="home-x" onClick={onClose} aria-label="Закрыть">✕</button></div>
       <div className="home-body">
 
         <div className="home-sec">

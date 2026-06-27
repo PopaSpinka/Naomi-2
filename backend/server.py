@@ -1,7 +1,7 @@
 """Бэкенд Наоми (FastAPI). Один процесс: отдаёт статику фронта и /api/*.
 
 Мозг — oai.py (запрос напрямую в backend-api/codex/responses по подписке, путь B).
-Личность — naomi.md + pravila.md в корне проекта (читаются на каждый запрос).
+Личность — persona/naomi.md + persona/pravila.md (читаются на каждый запрос).
 """
 import asyncio
 import json
@@ -29,13 +29,13 @@ FRONTEND = os.path.join(ROOT, "frontend")
 DATA = os.path.join(HERE, "data")
 os.makedirs(DATA, exist_ok=True)
 
-NAOMI_MD = os.path.join(ROOT, "naomi.md")
-PRAVILA_MD = os.path.join(ROOT, "pravila.md")
+NAOMI_MD = os.path.join(ROOT, "persona", "naomi.md")
+PRAVILA_MD = os.path.join(ROOT, "persona", "pravila.md")
 SETTINGS_FILE = os.path.join(DATA, "settings.json")
 SESSION_FILE = os.path.join(DATA, "session.json")
 
 DEFAULT_SETTINGS = {"model": "gpt-5.5", "reasoning": "low"}
-VERSION = "naomi-0.8.0"
+VERSION = "naomi-0.8.1"
 
 app = FastAPI()
 
@@ -268,9 +268,9 @@ async def events():
 
 @app.get("/api/docs")
 async def docs():
-    """Отдаёт DOCUMENTATION.md для вкладки «Документация»."""
+    """Отдаёт docs/DOCUMENTATION.md (вкладка убрана из UI, эндпоинт оставлен на потом)."""
     try:
-        with open(os.path.join(ROOT, "DOCUMENTATION.md"), "r", encoding="utf-8") as f:
+        with open(os.path.join(ROOT, "docs", "DOCUMENTATION.md"), "r", encoding="utf-8") as f:
             return {"markdown": f.read()}
     except Exception:
         return {"markdown": ""}

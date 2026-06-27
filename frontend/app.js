@@ -74,8 +74,7 @@ const TWEAK_DEFAULTS = (
     "streamEffect": "glow",
     "spinnerStyle": "pillar",
     "spinnerLabel": "Thinking\u2026",
-    "agentName": "Naomi",
-    "agentInitial": "N"
+    "agentName": "Naomi"
   }
 );
 const SPINNERS = {
@@ -104,31 +103,18 @@ const INITIAL_MESSAGES = [];
 const nid = (p = "m") => `${p}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
 const I18N = {
   en: {
-    "nav.general": "General",
     "nav.agent": "Agent",
-    "nav.naomi": "Naomi",
-    "nav.memory": "Memory",
-    "nav.livedata": "Live Data",
-    "nav.devices": "Devices",
-    "nav.api": "API",
-    "nav.reports": "Reports",
-    "nav.automations": "Automations",
-    "nav.timeline": "Timeline",
+    "nav.account": "Account",
     "nav.about": "About",
     "agent.desc": "Which model powers Naomi and how hard she thinks. Changes apply immediately.",
     "agent.model": "Model",
     "agent.modelDesc": "GPT-5.5 is the smartest; GPT-5.4 is balanced; GPT-5.4-Mini is the fastest and lightest.",
     "agent.reasoning": "Reasoning",
     "agent.reasoningDesc": "How deeply Naomi thinks before replying. Low is fast and natural for chat; higher levels think longer.",
-    "opt.off": "Off",
     "opt.low": "Low",
     "opt.medium": "Medium",
     "opt.high": "High",
-    "opt.max": "Max",
     "opt.xhigh": "Extra-high",
-    "nav.account": "Account",
-    "nav.docs": "Docs",
-    "docs.loading": "Loading\u2026",
     "account.desc": "Services connected to Naomi. Each lives here \u2014 sign in once, keys are stored locally.",
     "account.connected": "Connected",
     "account.disconnected": "Not connected",
@@ -155,31 +141,18 @@ const I18N = {
     "err.noReply": "Couldn't get a reply \u2014 check your connection and try again."
   },
   ru: {
-    "nav.general": "\u041E\u0431\u0449\u0438\u0435",
     "nav.agent": "\u0410\u0433\u0435\u043D\u0442",
-    "nav.naomi": "\u041D\u0430\u043E\u043C\u0438",
-    "nav.memory": "\u041F\u0430\u043C\u044F\u0442\u044C",
-    "nav.livedata": "\u0416\u0438\u0432\u044B\u0435 \u0434\u0430\u043D\u043D\u044B\u0435",
-    "nav.devices": "\u0423\u0441\u0442\u0440\u043E\u0439\u0441\u0442\u0432\u0430",
-    "nav.api": "API",
-    "nav.reports": "\u0420\u0435\u043F\u043E\u0440\u0442\u044B",
-    "nav.automations": "\u0410\u0432\u0442\u043E\u043C\u0430\u0442\u0438\u0437\u0430\u0446\u0438\u0438",
-    "nav.timeline": "\u041B\u0435\u0442\u043E\u043F\u0438\u0441\u044C",
+    "nav.account": "\u0410\u043A\u043A\u0430\u0443\u043D\u0442",
     "nav.about": "\u041E \u041D\u0430\u043E\u043C\u0438",
     "agent.desc": "\u041A\u0430\u043A\u0430\u044F \u043C\u043E\u0434\u0435\u043B\u044C \u043F\u0438\u0442\u0430\u0435\u0442 \u041D\u0430\u043E\u043C\u0438 \u0438 \u043D\u0430\u0441\u043A\u043E\u043B\u044C\u043A\u043E \u0433\u043B\u0443\u0431\u043E\u043A\u043E \u043E\u043D\u0430 \u0434\u0443\u043C\u0430\u0435\u0442. \u0418\u0437\u043C\u0435\u043D\u0435\u043D\u0438\u044F \u043F\u0440\u0438\u043C\u0435\u043D\u044F\u044E\u0442\u0441\u044F \u0441\u0440\u0430\u0437\u0443.",
     "agent.model": "\u041C\u043E\u0434\u0435\u043B\u044C",
     "agent.modelDesc": "GPT-5.5 \u2014 \u0441\u0430\u043C\u0430\u044F \u0443\u043C\u043D\u0430\u044F; GPT-5.4 \u2014 \u0441\u0431\u0430\u043B\u0430\u043D\u0441\u0438\u0440\u043E\u0432\u0430\u043D\u043D\u0430\u044F; GPT-5.4-Mini \u2014 \u0441\u0430\u043C\u0430\u044F \u0431\u044B\u0441\u0442\u0440\u0430\u044F \u0438 \u043B\u0451\u0433\u043A\u0430\u044F.",
     "agent.reasoning": "\u0420\u0430\u0437\u043C\u044B\u0448\u043B\u0435\u043D\u0438\u0435",
     "agent.reasoningDesc": "\u041D\u0430\u0441\u043A\u043E\u043B\u044C\u043A\u043E \u0433\u043B\u0443\u0431\u043E\u043A\u043E \u041D\u0430\u043E\u043C\u0438 \u0434\u0443\u043C\u0430\u0435\u0442 \u043F\u0435\u0440\u0435\u0434 \u043E\u0442\u0432\u0435\u0442\u043E\u043C. \u041D\u0438\u0437\u043A\u0438\u0439 \u2014 \u0431\u044B\u0441\u0442\u0440\u043E \u0438 \u0435\u0441\u0442\u0435\u0441\u0442\u0432\u0435\u043D\u043D\u043E \u0434\u043B\u044F \u0431\u043E\u043B\u0442\u043E\u0432\u043D\u0438; \u0432\u044B\u0448\u0435 \u2014 \u0434\u0443\u043C\u0430\u0435\u0442 \u0434\u043E\u043B\u044C\u0448\u0435.",
-    "opt.off": "\u0412\u044B\u043A\u043B",
     "opt.low": "\u041D\u0438\u0437\u043A\u0438\u0439",
     "opt.medium": "\u0421\u0440\u0435\u0434\u043D\u0438\u0439",
     "opt.high": "\u0412\u044B\u0441\u043E\u043A\u0438\u0439",
-    "opt.max": "\u041C\u0430\u043A\u0441",
     "opt.xhigh": "\u042D\u043A\u0441\u0442\u0440\u0430",
-    "nav.account": "\u0410\u043A\u043A\u0430\u0443\u043D\u0442",
-    "nav.docs": "\u0414\u043E\u043A\u0443\u043C\u0435\u043D\u0442\u0430\u0446\u0438\u044F",
-    "docs.loading": "\u0417\u0430\u0433\u0440\u0443\u0436\u0430\u044E\u2026",
     "account.desc": "\u0421\u0435\u0440\u0432\u0438\u0441\u044B, \u043F\u043E\u0434\u043A\u043B\u044E\u0447\u0451\u043D\u043D\u044B\u0435 \u043A \u041D\u0430\u043E\u043C\u0438. \u0412\u0441\u0451 \u0436\u0438\u0432\u0451\u0442 \u0437\u0434\u0435\u0441\u044C \u2014 \u0432\u0445\u043E\u0434\u0438\u0448\u044C \u043E\u0434\u0438\u043D \u0440\u0430\u0437, \u043A\u043B\u044E\u0447\u0438 \u0445\u0440\u0430\u043D\u044F\u0442\u0441\u044F \u043B\u043E\u043A\u0430\u043B\u044C\u043D\u043E.",
     "account.connected": "\u041F\u043E\u0434\u043A\u043B\u044E\u0447\u0435\u043D\u043E",
     "account.disconnected": "\u041D\u0435 \u043F\u043E\u0434\u043A\u043B\u044E\u0447\u0435\u043D\u043E",
@@ -619,15 +592,6 @@ function App() {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [settingsOpen]);
-  const [uiLang, setUiLang] = useState(UI_LANG);
-  const switchLang = (v) => {
-    UI_LANG = v;
-    try {
-      localStorage.setItem("naomi-lang", v);
-    } catch (e) {
-    }
-    setUiLang(v);
-  };
   const [busyTurns, setBusyTurns] = useState(() => /* @__PURE__ */ new Set());
   const [fadingTurns, setFadingTurns] = useState(() => /* @__PURE__ */ new Set());
   const [instantTurns, setInstantTurns] = useState(() => /* @__PURE__ */ new Set());
@@ -805,7 +769,7 @@ function App() {
     };
     try {
       await window.claude.stream(
-        { messages: nextMessages.map((m) => ({ role: m.role, content: m.content })), client_turn_id: userId },
+        { messages: nextMessages.map((m) => ({ role: m.role, content: m.content })) },
         onDelta,
         onTool
       );
@@ -864,7 +828,7 @@ function App() {
         minHeight: lastTurnMinHeight
       }
     );
-  }))), /* @__PURE__ */ React.createElement(Composer, { onSend: handleSend, disabled: thinking }), version ? /* @__PURE__ */ React.createElement("div", { className: "version-badge", title: "\u0422\u0435\u043A\u0443\u0449\u0430\u044F \u0432\u0435\u0440\u0441\u0438\u044F (git HEAD)" }, version) : null, /* @__PURE__ */ React.createElement(HomePanel, { open: homeOpen, home, onPatch: patchHome, onClose: () => setHomeOpen(false) }), /* @__PURE__ */ React.createElement(TweaksPanel, { title: "Tweaks" }, /* @__PURE__ */ React.createElement(TweakSection, { label: "\u0412\u043D\u0435\u0448\u043D\u0438\u0439 \u0432\u0438\u0434" }), /* @__PURE__ */ React.createElement(TweakRadio, { label: "\u0422\u0435\u043C\u0430", value: t.theme, options: ["light", "dark"], onChange: (v) => setTweak("theme", v) }), /* @__PURE__ */ React.createElement(TweakRadio, { label: "\u041F\u043B\u043E\u0442\u043D\u043E\u0441\u0442\u044C", value: t.density, options: ["compact", "regular", "comfy"], onChange: (v) => setTweak("density", v) }), /* @__PURE__ */ React.createElement(TweakSelect, { label: "\u042D\u0444\u0444\u0435\u043A\u0442 \u043F\u043E\u0442\u043E\u043A\u0430", value: t.streamEffect, options: ["blur", "rise", "glow", "fade", "tilt", "bloom", "scan"], onChange: (v) => setTweak("streamEffect", v) }), /* @__PURE__ */ React.createElement(TweakSection, { label: "\u0421\u043F\u0438\u043D\u0435\u0440" }), /* @__PURE__ */ React.createElement(TweakSelect, { label: "\u0421\u0442\u0438\u043B\u044C", value: t.spinnerStyle, options: ["ring", "dots", "pulse", "bars", "orbit", "shimmer", "wave", "morph", "breath", "dual", "pillar"], onChange: (v) => setTweak("spinnerStyle", v) }), /* @__PURE__ */ React.createElement(TweakText, { label: "\u041F\u043E\u0434\u043F\u0438\u0441\u044C (\u0434\u043B\u044F shimmer)", value: t.spinnerLabel, onChange: (v) => setTweak("spinnerLabel", v) }), /* @__PURE__ */ React.createElement(TweakSection, { label: "\u0410\u0433\u0435\u043D\u0442" }), /* @__PURE__ */ React.createElement(TweakText, { label: "\u0418\u043C\u044F", value: t.agentName, onChange: (v) => setTweak("agentName", v) }), /* @__PURE__ */ React.createElement(TweakText, { label: "\u0418\u043D\u0438\u0446\u0438\u0430\u043B", value: t.agentInitial, onChange: (v) => setTweak("agentInitial", v.slice(0, 1).toUpperCase()) })), /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("style", null, ".set-backdrop{position:fixed;inset:0;z-index:2147483600;background:rgba(0,0,0,.5);backdrop-filter:blur(7px);-webkit-backdrop-filter:blur(7px);display:flex;align-items:center;justify-content:center;animation:setfade .15s ease}@keyframes setfade{from{opacity:0}to{opacity:1}}.set-modal{position:relative;width:min(860px,92vw);height:min(600px,85vh);display:flex;background:#1d1d1b;color:#ece9e3;border:1px solid rgba(255,255,255,.09);border-radius:16px;overflow:hidden;box-shadow:0 30px 90px rgba(0,0,0,.55)}.set-side{flex:0 0 210px;background:#171716;border-right:1px solid rgba(255,255,255,.07);padding:18px 10px;display:flex;flex-direction:column;gap:2px}.set-nav{display:flex;align-items:center;gap:11px;padding:9px 12px;border-radius:9px;cursor:pointer;color:#b6b3aa;font-size:14px;border:none;background:none;text-align:left;width:100%;font-family:inherit;transition:background .12s,color .12s}.set-nav:hover{background:rgba(255,255,255,.05);color:#ece9e3}.set-nav.active{background:rgba(255,255,255,.1);color:#fff}.set-nav svg{width:18px;height:18px;flex:0 0 18px;opacity:.9}.set-main{flex:1;min-width:0;padding:28px 34px;overflow-y:auto}.set-h{font-size:21px;font-weight:600;margin:0 0 18px}.set-row{display:flex;align-items:flex-start;justify-content:space-between;gap:24px;padding:17px 2px;border-bottom:1px solid rgba(255,255,255,.06)}.set-row:last-child{border-bottom:none}.set-rt{font-size:14.5px;font-weight:500;margin:0 0 4px}.set-rd{font-size:13px;color:#9a978f;margin:0;line-height:1.5;max-width:46ch}.set-x{position:absolute;top:16px;right:18px;background:none;border:none;color:#9a978f;font-size:20px;cursor:pointer;line-height:1;padding:4px;z-index:2}.set-x:hover{color:#fff}.set-select{background:#2b2b28;color:#ece9e3;border:1px solid rgba(255,255,255,.12);border-radius:8px;padding:7px 10px;font-size:13.5px;cursor:pointer;font-family:inherit}.set-sw{width:42px;height:24px;border-radius:999px;border:none;cursor:pointer;position:relative;transition:background .15s;background:#3a3a37;flex:0 0 auto}.set-sw.on{background:#4a9eff}.set-sw::after{content:'';position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:#fff;transition:left .15s}.set-sw.on::after{left:21px}.set-btn{background:#2b2b28;color:#ece9e3;border:1px solid rgba(255,255,255,.12);border-radius:8px;padding:7px 14px;font-size:13px;cursor:pointer;font-family:inherit}.set-btn:hover{background:#35342f}.doc-h{font-size:16px;font-weight:600;margin:18px 0 8px;color:#ece9e3}.doc-h:first-child{margin-top:0}.doc-body{font-size:13.5px;line-height:1.6;color:#c9c6be}.doc-body p{margin:0 0 10px}.doc-body code{background:#2b2b28;padding:1px 5px;border-radius:4px;font-size:12px}.doc-body table{font-size:12.5px}"), settingsOpen ? /* @__PURE__ */ React.createElement("div", { className: "set-backdrop", onClick: () => setSettingsOpen(false) }, /* @__PURE__ */ React.createElement("div", { className: "set-modal", role: "dialog", "aria-modal": "true", "aria-label": "Settings", onClick: (e) => e.stopPropagation() }, /* @__PURE__ */ React.createElement("button", { className: "set-x", "aria-label": "Close", onClick: () => setSettingsOpen(false) }, "\u2715"), /* @__PURE__ */ React.createElement("div", { className: "set-side" }, /* @__PURE__ */ React.createElement("button", { className: "set-nav" + (settingsTab === "agent" ? " active" : ""), onClick: () => setSettingsTab("agent") }, /* @__PURE__ */ React.createElement("svg", { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.7", strokeLinecap: "round", strokeLinejoin: "round" }, /* @__PURE__ */ React.createElement("path", { d: "M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" }), /* @__PURE__ */ React.createElement("circle", { cx: "12", cy: "7", r: "4" })), /* @__PURE__ */ React.createElement("span", null, L("nav.agent"))), /* @__PURE__ */ React.createElement("button", { className: "set-nav" + (settingsTab === "account" ? " active" : ""), onClick: () => {
+  }))), /* @__PURE__ */ React.createElement(Composer, { onSend: handleSend, disabled: thinking }), version ? /* @__PURE__ */ React.createElement("div", { className: "version-badge", title: "\u0422\u0435\u043A\u0443\u0449\u0430\u044F \u0432\u0435\u0440\u0441\u0438\u044F (git HEAD)" }, version) : null, /* @__PURE__ */ React.createElement(HomePanel, { open: homeOpen, home, onPatch: patchHome, onClose: () => setHomeOpen(false) }), /* @__PURE__ */ React.createElement(TweaksPanel, { title: "Tweaks" }, /* @__PURE__ */ React.createElement(TweakSection, { label: "\u0412\u043D\u0435\u0448\u043D\u0438\u0439 \u0432\u0438\u0434" }), /* @__PURE__ */ React.createElement(TweakRadio, { label: "\u0422\u0435\u043C\u0430", value: t.theme, options: ["light", "dark"], onChange: (v) => setTweak("theme", v) }), /* @__PURE__ */ React.createElement(TweakRadio, { label: "\u041F\u043B\u043E\u0442\u043D\u043E\u0441\u0442\u044C", value: t.density, options: ["compact", "regular", "comfy"], onChange: (v) => setTweak("density", v) }), /* @__PURE__ */ React.createElement(TweakSelect, { label: "\u042D\u0444\u0444\u0435\u043A\u0442 \u043F\u043E\u0442\u043E\u043A\u0430", value: t.streamEffect, options: ["blur", "rise", "glow", "fade", "tilt", "bloom", "scan"], onChange: (v) => setTweak("streamEffect", v) }), /* @__PURE__ */ React.createElement(TweakSection, { label: "\u0421\u043F\u0438\u043D\u0435\u0440" }), /* @__PURE__ */ React.createElement(TweakSelect, { label: "\u0421\u0442\u0438\u043B\u044C", value: t.spinnerStyle, options: ["ring", "dots", "pulse", "bars", "orbit", "shimmer", "wave", "morph", "breath", "dual", "pillar"], onChange: (v) => setTweak("spinnerStyle", v) }), /* @__PURE__ */ React.createElement(TweakText, { label: "\u041F\u043E\u0434\u043F\u0438\u0441\u044C (\u0434\u043B\u044F shimmer)", value: t.spinnerLabel, onChange: (v) => setTweak("spinnerLabel", v) }), /* @__PURE__ */ React.createElement(TweakSection, { label: "\u0410\u0433\u0435\u043D\u0442" }), /* @__PURE__ */ React.createElement(TweakText, { label: "\u0418\u043C\u044F", value: t.agentName, onChange: (v) => setTweak("agentName", v) })), /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("style", null, ".set-backdrop{position:fixed;inset:0;z-index:2147483600;background:rgba(0,0,0,.5);backdrop-filter:blur(7px);-webkit-backdrop-filter:blur(7px);display:flex;align-items:center;justify-content:center;animation:setfade .15s ease}@keyframes setfade{from{opacity:0}to{opacity:1}}.set-modal{position:relative;width:min(860px,92vw);height:min(600px,85vh);display:flex;background:#1d1d1b;color:#ece9e3;border:1px solid rgba(255,255,255,.09);border-radius:16px;overflow:hidden;box-shadow:0 30px 90px rgba(0,0,0,.55)}.set-side{flex:0 0 210px;background:#171716;border-right:1px solid rgba(255,255,255,.07);padding:18px 10px;display:flex;flex-direction:column;gap:2px}.set-nav{display:flex;align-items:center;gap:11px;padding:9px 12px;border-radius:9px;cursor:pointer;color:#b6b3aa;font-size:14px;border:none;background:none;text-align:left;width:100%;font-family:inherit;transition:background .12s,color .12s}.set-nav:hover{background:rgba(255,255,255,.05);color:#ece9e3}.set-nav.active{background:rgba(255,255,255,.1);color:#fff}.set-nav svg{width:18px;height:18px;flex:0 0 18px;opacity:.9}.set-main{flex:1;min-width:0;padding:28px 34px;overflow-y:auto}.set-h{font-size:21px;font-weight:600;margin:0 0 18px}.set-row{display:flex;align-items:flex-start;justify-content:space-between;gap:24px;padding:17px 2px;border-bottom:1px solid rgba(255,255,255,.06)}.set-row:last-child{border-bottom:none}.set-rt{font-size:14.5px;font-weight:500;margin:0 0 4px}.set-rd{font-size:13px;color:#9a978f;margin:0;line-height:1.5;max-width:46ch}.set-x{position:absolute;top:16px;right:18px;background:none;border:none;color:#9a978f;font-size:20px;cursor:pointer;line-height:1;padding:4px;z-index:2}.set-x:hover{color:#fff}.set-select{background:#2b2b28;color:#ece9e3;border:1px solid rgba(255,255,255,.12);border-radius:8px;padding:7px 10px;font-size:13.5px;cursor:pointer;font-family:inherit}.set-sw{width:42px;height:24px;border-radius:999px;border:none;cursor:pointer;position:relative;transition:background .15s;background:#3a3a37;flex:0 0 auto}.set-sw.on{background:#4a9eff}.set-sw::after{content:'';position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:#fff;transition:left .15s}.set-sw.on::after{left:21px}.set-btn{background:#2b2b28;color:#ece9e3;border:1px solid rgba(255,255,255,.12);border-radius:8px;padding:7px 14px;font-size:13px;cursor:pointer;font-family:inherit}.set-btn:hover{background:#35342f}.doc-h{font-size:16px;font-weight:600;margin:18px 0 8px;color:#ece9e3}.doc-h:first-child{margin-top:0}.doc-body{font-size:13.5px;line-height:1.6;color:#c9c6be}.doc-body p{margin:0 0 10px}.doc-body code{background:#2b2b28;padding:1px 5px;border-radius:4px;font-size:12px}.doc-body table{font-size:12.5px}"), settingsOpen ? /* @__PURE__ */ React.createElement("div", { className: "set-backdrop", onClick: () => setSettingsOpen(false) }, /* @__PURE__ */ React.createElement("div", { className: "set-modal", role: "dialog", "aria-modal": "true", "aria-label": "Settings", onClick: (e) => e.stopPropagation() }, /* @__PURE__ */ React.createElement("button", { className: "set-x", "aria-label": "Close", onClick: () => setSettingsOpen(false) }, "\u2715"), /* @__PURE__ */ React.createElement("div", { className: "set-side" }, /* @__PURE__ */ React.createElement("button", { className: "set-nav" + (settingsTab === "agent" ? " active" : ""), onClick: () => setSettingsTab("agent") }, /* @__PURE__ */ React.createElement("svg", { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.7", strokeLinecap: "round", strokeLinejoin: "round" }, /* @__PURE__ */ React.createElement("path", { d: "M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" }), /* @__PURE__ */ React.createElement("circle", { cx: "12", cy: "7", r: "4" })), /* @__PURE__ */ React.createElement("span", null, L("nav.agent"))), /* @__PURE__ */ React.createElement("button", { className: "set-nav" + (settingsTab === "account" ? " active" : ""), onClick: () => {
     setSettingsTab("account");
     loadAuth();
     loadTavily();

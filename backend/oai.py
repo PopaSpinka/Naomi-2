@@ -39,6 +39,10 @@ def save_tokens(data: dict, path: str = AUTH_PATH) -> None:
     with open(tmp, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False)
     os.replace(tmp, path)
+    try:
+        os.chmod(path, 0o600)   # в файле OAuth-токены — только владельцу
+    except Exception:
+        pass
 
 
 def _jwt_exp(token: str) -> int:
@@ -191,8 +195,11 @@ _refresh_lock = asyncio.Lock()
 
 
 async def _fresh_tokens(auth_path):
+    # ensure_fresh может сделать СИНХРОННЫЙ refresh (httpx.post, до 30с) — уносим в поток,
+    # чтобы не морозить общий event loop (веб-стримы + телеграм-поллер). Лок держим:
+    # refresh_token одноразовый, параллельные обновления нельзя.
     async with _refresh_lock:
-        return ensure_fresh(load_tokens(auth_path), auth_path)["tokens"]
+        return (await asyncio.to_thread(lambda: ensure_fresh(load_tokens(auth_path), auth_path)))["tokens"]
 
 
 async def _refresh_after_401(auth_path, used_access_token):
@@ -201,7 +208,7 @@ async def _refresh_after_401(auth_path, used_access_token):
         cur = data.get("tokens", {}).get("access_token")
         if cur and cur != used_access_token:
             return data["tokens"]  # уже обновлён другим запросом — берём новый
-        return refresh_tokens(data, auth_path)["tokens"]
+        return (await asyncio.to_thread(refresh_tokens, data, auth_path))["tokens"]  # sync refresh → в поток
 
 
 async def _parse_events(resp):

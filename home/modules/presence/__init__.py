@@ -19,5 +19,7 @@ DEFAULT = {
 def context(s):
     parts = []
     for name, p in (s or {}).items():
+        if not isinstance(p, dict):   # патч мог прислать не-словарь — не падаем
+            continue
         parts.append(f"{name} дома ({p.get('room', '?')})" if p.get("home") else f"{name} не дома")
     return ", ".join(parts) if parts else None

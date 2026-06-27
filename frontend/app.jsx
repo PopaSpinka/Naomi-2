@@ -4,7 +4,7 @@ window.claude = {
   complete: async function(options) {
     // Таймаут на запрос: при зависшем сервере иначе вечный спиннер и заблокированный ввод
     // (до многоминутного браузерного дефолта). 90с — выше реального думающего чат-ответа,
-    // ниже 120с-потолка DeepSeek на сервере. По таймауту бросаем → submit покажет ошибку и разблокирует.
+    // но не вечность. По таймауту бросаем → submit покажет ошибку и разблокирует ввод.
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 90000);
     try {
@@ -72,8 +72,7 @@ const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
   "streamEffect": "glow",
   "spinnerStyle": "pillar",
   "spinnerLabel": "Thinking…",
-  "agentName": "Naomi",
-  "agentInitial": "N"
+  "agentName": "Naomi"
 }/*EDITMODE-END*/;
 
 const SPINNERS = {
@@ -112,14 +111,11 @@ const nid = (p = "m") => `${p}-${Date.now().toString(36)}-${Math.random().toStri
 // ---------------------------------------------------------------- i18n
 const I18N = {
   en: {
-    "nav.general": "General", "nav.agent": "Agent", "nav.naomi": "Naomi", "nav.memory": "Memory",
-    "nav.livedata": "Live Data", "nav.devices": "Devices", "nav.api": "API", "nav.reports": "Reports", "nav.automations": "Automations", "nav.timeline": "Timeline", "nav.about": "About",
+    "nav.agent": "Agent", "nav.account": "Account", "nav.about": "About",
     "agent.desc": "Which model powers Naomi and how hard she thinks. Changes apply immediately.",
     "agent.model": "Model", "agent.modelDesc": "GPT-5.5 is the smartest; GPT-5.4 is balanced; GPT-5.4-Mini is the fastest and lightest.",
     "agent.reasoning": "Reasoning", "agent.reasoningDesc": "How deeply Naomi thinks before replying. Low is fast and natural for chat; higher levels think longer.",
-    "opt.off": "Off", "opt.low": "Low", "opt.medium": "Medium", "opt.high": "High", "opt.max": "Max", "opt.xhigh": "Extra-high",
-    "nav.account": "Account", "nav.docs": "Docs",
-    "docs.loading": "Loading…",
+    "opt.low": "Low", "opt.medium": "Medium", "opt.high": "High", "opt.xhigh": "Extra-high",
     "account.desc": "Services connected to Naomi. Each lives here — sign in once, keys are stored locally.",
     "account.connected": "Connected", "account.disconnected": "Not connected",
     "account.plan": "Plan", "account.loginHint": "Sign in with your ChatGPT account to power Naomi.",
@@ -139,14 +135,11 @@ const I18N = {
     "err.noReply": "Couldn't get a reply — check your connection and try again.",
   },
   ru: {
-    "nav.general": "Общие", "nav.agent": "Агент", "nav.naomi": "Наоми", "nav.memory": "Память",
-    "nav.livedata": "Живые данные", "nav.devices": "Устройства", "nav.api": "API", "nav.reports": "Репорты", "nav.automations": "Автоматизации", "nav.timeline": "Летопись", "nav.about": "О Наоми",
+    "nav.agent": "Агент", "nav.account": "Аккаунт", "nav.about": "О Наоми",
     "agent.desc": "Какая модель питает Наоми и насколько глубоко она думает. Изменения применяются сразу.",
     "agent.model": "Модель", "agent.modelDesc": "GPT-5.5 — самая умная; GPT-5.4 — сбалансированная; GPT-5.4-Mini — самая быстрая и лёгкая.",
     "agent.reasoning": "Размышление", "agent.reasoningDesc": "Насколько глубоко Наоми думает перед ответом. Низкий — быстро и естественно для болтовни; выше — думает дольше.",
-    "opt.off": "Выкл", "opt.low": "Низкий", "opt.medium": "Средний", "opt.high": "Высокий", "opt.max": "Макс", "opt.xhigh": "Экстра",
-    "nav.account": "Аккаунт", "nav.docs": "Документация",
-    "docs.loading": "Загружаю…",
+    "opt.low": "Низкий", "opt.medium": "Средний", "opt.high": "Высокий", "opt.xhigh": "Экстра",
     "account.desc": "Сервисы, подключённые к Наоми. Всё живёт здесь — входишь один раз, ключи хранятся локально.",
     "account.connected": "Подключено", "account.disconnected": "Не подключено",
     "account.plan": "План", "account.loginHint": "Войди через аккаунт ChatGPT, чтобы Наоми заработала.",
@@ -713,8 +706,8 @@ function App() {
     return next;
   });
   const loadSettings = () => fetch("/api/settings").then((r) => r.json()).then((d) => setAgentCfg((c) => Object.assign({}, c, d))).catch(() => {});
-  // Подтягиваем сохранённые настройки сразу при загрузке — чтобы видимость облачек
-  // задач (showTaskChips) и прочее отражали сервер, а не только после открытия настроек.
+  // Подтягиваем сохранённые настройки сразу при загрузке — чтобы UI отражал состояние
+  // сервера, а не только после открытия модалки настроек.
   useEffect(() => { loadSettings(); loadAuth(); loadHome(); }, []);
   // Esc закрывает модалку настроек (раньше — только клик по фону/✕, rank 17).
   useEffect(() => {
@@ -723,17 +716,10 @@ function App() {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [settingsOpen]);
-  const [uiLang, setUiLang] = useState(UI_LANG);
-  const switchLang = (v) => {
-    UI_LANG = v;
-    try { localStorage.setItem("naomi-lang", v); } catch (e) {}
-    setUiLang(v);
-  };
   const [busyTurns, setBusyTurns] = useState(() => new Set());
   const [fadingTurns, setFadingTurns] = useState(() => new Set());
-  // Ходы, где агент ответил БЕЗ размышления → зелёный спиннер. Заполняется по ФАКТУ
-  // (reply.thought от сервера), а не по настройке: провизорно на отправке, уточняется
-  // по ответу. Жёлтый = думала; голубой (brainTurns/задача) перебивает оба.
+  // Ходы с зелёным спиннером (ответ без размышления). Провизорно ставится на отправке,
+  // если reasoning="off"; по умолчанию (думает) — жёлтый/accent.
   const [instantTurns, setInstantTurns] = useState(() => new Set());
   const [scrollH, setScrollH] = useState(600);
   const scrollRef = useRef(null);
@@ -873,8 +859,7 @@ function App() {
     setThinking(true);
     setAdd(setBusyTurns, userId);
     setDel(setFadingTurns, userId);
-    // Провизорный цвет спиннера: «off» точно без раздумий → зелёный; иначе пока жёлтый
-    // (думающий режим), уточним по факту, когда придёт reply.thought.
+    // Провизорный цвет спиннера: «off» → зелёный (без раздумий); иначе жёлтый (думает).
     if (agentCfg.reasoning === "off") setAdd(setInstantTurns, userId); else setDel(setInstantTurns, userId);
     lastSubmittedRef.current = userId;
 
@@ -904,7 +889,7 @@ function App() {
 
     try {
       await window.claude.stream(
-        { messages: nextMessages.map((m) => ({ role: m.role, content: m.content })), client_turn_id: userId },
+        { messages: nextMessages.map((m) => ({ role: m.role, content: m.content })) },
         onDelta, onTool
       );
       if (pending) flush();                       // долить остаток последнего кадра
@@ -990,7 +975,6 @@ function App() {
         <TweakText label="Подпись (для shimmer)" value={t.spinnerLabel} onChange={(v) => setTweak("spinnerLabel", v)} />
         <TweakSection label="Агент" />
         <TweakText label="Имя" value={t.agentName} onChange={(v) => setTweak("agentName", v)} />
-        <TweakText label="Инициал" value={t.agentInitial} onChange={(v) => setTweak("agentInitial", v.slice(0, 1).toUpperCase())} />
       </TweaksPanel>
 
       <React.Fragment>

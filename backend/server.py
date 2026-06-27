@@ -35,7 +35,7 @@ SETTINGS_FILE = os.path.join(DATA, "settings.json")
 SESSION_FILE = os.path.join(DATA, "session.json")
 
 DEFAULT_SETTINGS = {"model": "gpt-5.5", "reasoning": "low"}
-VERSION = "naomi-0.8.1"
+VERSION = "naomi-0.9.0"
 
 app = FastAPI()
 
@@ -264,16 +264,6 @@ async def events():
             _sse_clients.discard(q)
 
     return StreamingResponse(gen(), media_type="text/event-stream")
-
-
-@app.get("/api/docs")
-async def docs():
-    """Отдаёт docs/DOCUMENTATION.md (вкладка убрана из UI, эндпоинт оставлен на потом)."""
-    try:
-        with open(os.path.join(ROOT, "docs", "DOCUMENTATION.md"), "r", encoding="utf-8") as f:
-            return {"markdown": f.read()}
-    except Exception:
-        return {"markdown": ""}
 
 
 _tg_task = None

@@ -9,7 +9,7 @@ import os
 import uuid
 
 from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
 import auth
@@ -245,5 +245,12 @@ async def _stop_telegram():
         _tg_task.cancel()
 
 
-# статика фронта монтируется ПОСЛЕ /api/* — ловит всё остальное
+@app.get("/")
+async def index():
+    # index.html — всегда ревалидировать (no-cache), чтобы браузер подхватывал свежий ?v= ассетов
+    # и не залипал на старом app.js (иначе старый фронт не понимает новый SSE-стрим).
+    return FileResponse(os.path.join(FRONTEND, "index.html"), headers={"Cache-Control": "no-cache"})
+
+
+# статика фронта монтируется ПОСЛЕ /api/* — ловит всё остальное (ассеты версионированы ?v=хэш)
 app.mount("/", StaticFiles(directory=FRONTEND, html=True), name="frontend")

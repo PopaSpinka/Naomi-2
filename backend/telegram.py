@@ -43,10 +43,12 @@ async def _send(client, token, chat_id, text):
 
 
 # Живой стрим: правим одно сообщение по мере генерации (эффект «печати»).
-# У Телеграма нет токен-стрима — это делается частыми editMessageText. Правки
-# лимитированы (безопасно ~1/сек на сообщение, обе edit-операции в одном ведре),
-# поэтому флашим не чаще EDIT_INTERVAL и уважаем retry_after при 429.
-EDIT_INTERVAL = 1.1
+# У Телеграма нет токен-стрима — это делается частыми editMessageText. Темп правок
+# выверен замером по живому боту (300мс шли без флуд-вейтов), поэтому держим 0.4с
+# (≈2.5 правки/с — заметно плавнее, мельче куски), а поймав 429 — сбавляем темп и
+# уважаем retry_after. Обе edit-операции делят один лимит-«ведро».
+EDIT_INTERVAL = 0.4
+EDIT_INTERVAL_SLOW = 1.2   # запасной темп после флуд-вейта (429)
 SEARCH_HINT = "ищу в интернете…"
 
 
@@ -62,10 +64,11 @@ async def _stream_reply(client, token, chat_id, convo, *, instructions, model, e
     acc = ""              # накопленный текст ответа
     shown = "…"           # что сейчас отрисовано в сообщении
     searching = False     # идёт веб-поиск → показываем статус вместо текста
-    last_edit = loop.time() - EDIT_INTERVAL   # чтобы первый кусок показать сразу
+    interval = EDIT_INTERVAL                  # текущий темп (сбавим, если поймаем 429)
+    last_edit = loop.time() - interval        # чтобы первый кусок показать сразу
 
     async def flush(force=False):
-        nonlocal last_edit, shown
+        nonlocal last_edit, shown, interval
         if searching:
             text = (acc + "\n\n" + SEARCH_HINT) if acc else SEARCH_HINT
         else:
@@ -73,13 +76,14 @@ async def _stream_reply(client, token, chat_id, convo, *, instructions, model, e
         text = (text.strip()[:MSG_LIMIT]) or "…"
         if text == shown:
             return
-        if not force and (loop.time() - last_edit) < EDIT_INTERVAL:
+        if not force and (loop.time() - last_edit) < interval:
             return
         r = await _api(client, token, "editMessageText", chat_id=chat_id, message_id=mid, text=text)
         if not r.get("ok"):
             ra = (r.get("parameters") or {}).get("retry_after")
             if ra:
-                await asyncio.sleep(min(ra, 10) + 0.3)   # флуд-вейт — подождём и попробуем позже
+                interval = EDIT_INTERVAL_SLOW            # поймали флуд-вейт → до конца ответа темп помедленнее
+                await asyncio.sleep(min(ra, 10) + 0.3)
             return
         shown, last_edit = text, loop.time()
 

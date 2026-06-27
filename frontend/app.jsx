@@ -411,18 +411,29 @@ function formatAssistant(text, streaming, perWord) {
   return { content: rendered, totalWords: ctx.idx, perWord: ctx.perWord };
 }
 
-// Слова статус-строки поиска как .word-спаны — тот же стрим-эффект, что у ответов
-// (наследуется от body[data-stream]). Стаггер даёт левую-направо «проявку».
-function streamWords(text, perWord) {
-  const out = [];
-  let idx = 0;
-  String(text).split(/(\s+)/).forEach((tok, i) => {
-    if (!tok) return;
-    if (/^\s+$/.test(tok)) { out.push(tok); return; }
-    const j = idx++;
-    out.push(<span key={i} className="word" style={{ animationDelay: (j * perWord) + "ms" }}>{tok}</span>);
-  });
-  return out;
+// Статус-строка поиска. Появляется мягким fade'ом БЕЗ вертикального выезда.
+// Когда между хопами меняется запрос — старый текст плавно растворяется, а новый
+// проявляется на его месте (crossfade): строка не пропадает и не «перепечатывается».
+function SearchNote({ label, style }) {
+  const [shown, setShown] = useState(label);
+  const [prev, setPrev] = useState(null);
+  useEffect(() => {
+    if (label === shown) return;          // первое появление / без изменений — ничего не делаем
+    setPrev(shown);                       // уходящий запрос — растворяется
+    setShown(label);                      // новый — проявляется на его месте
+    const t = setTimeout(() => setPrev(null), 460);
+    return () => clearTimeout(t);
+  }, [label]);                            // eslint-disable-line react-hooks/exhaustive-deps
+  return (
+    <div className="search-note" style={style}>
+      {"ищу в интернете: «"}
+      <span className="sn-swap">
+        {prev != null ? <span className="sn-out" key={"o" + prev}>{prev}</span> : null}
+        <span className="sn-in" key={"i" + shown}>{shown}</span>
+      </span>
+      {"»…"}
+    </div>
+  );
 }
 
 const IconSend = () => (
@@ -498,7 +509,7 @@ function Turn({ turn, isLast, busy, leaving, instant, minHeight, spinnerStyle, s
               </span>
             </div>
             <div className={"asst-body" + (asst.erasing ? " is-erasing" : "")}>
-              {asst.searchLabel != null ? (<div className="search-note" key={asst.searchLabel} style={{ marginBottom: formatted ? 8 : 0 }}>{streamWords("ищу в интернете: «" + asst.searchLabel + "»…", 24)}</div>) : null}
+              {asst.searchLabel != null ? (<SearchNote label={asst.searchLabel} style={{ marginBottom: formatted ? 8 : 0 }} />) : null}
               {formatted ? formatted.content : null}
             </div>
           </div>

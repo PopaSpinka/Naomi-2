@@ -411,6 +411,20 @@ function formatAssistant(text, streaming, perWord) {
   return { content: rendered, totalWords: ctx.idx, perWord: ctx.perWord };
 }
 
+// Слова статус-строки поиска как .word-спаны — тот же стрим-эффект, что у ответов
+// (наследуется от body[data-stream]). Стаггер даёт левую-направо «проявку».
+function streamWords(text, perWord) {
+  const out = [];
+  let idx = 0;
+  String(text).split(/(\s+)/).forEach((tok, i) => {
+    if (!tok) return;
+    if (/^\s+$/.test(tok)) { out.push(tok); return; }
+    const j = idx++;
+    out.push(<span key={i} className="word" style={{ animationDelay: (j * perWord) + "ms" }}>{tok}</span>);
+  });
+  return out;
+}
+
 const IconSend = () => (
   <svg viewBox="0 0 16 16" fill="none">
     <path d="M8 13V3M8 3L3.5 7.5M8 3l4.5 4.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
@@ -484,7 +498,7 @@ function Turn({ turn, isLast, busy, leaving, instant, minHeight, spinnerStyle, s
               </span>
             </div>
             <div className={"asst-body" + (asst.erasing ? " is-erasing" : "")}>
-              {asst.searchLabel ? (<div style={{ fontSize: 13.5, opacity: 0.65, fontStyle: "italic", marginBottom: formatted ? 8 : 0 }}>🔎 ищу в интернете: «{asst.searchLabel}»…</div>) : null}
+              {asst.searchLabel != null ? (<div className="search-note" key={asst.searchLabel} style={{ marginBottom: formatted ? 8 : 0 }}>{streamWords("ищу в интернете: «" + asst.searchLabel + "»…", 24)}</div>) : null}
               {formatted ? formatted.content : null}
             </div>
           </div>

@@ -422,6 +422,20 @@ function formatAssistant(text, streaming, perWord) {
   });
   return { content: rendered, totalWords: ctx.idx, perWord: ctx.perWord };
 }
+function streamWords(text, perWord) {
+  const out = [];
+  let idx = 0;
+  String(text).split(/(\s+)/).forEach((tok, i) => {
+    if (!tok) return;
+    if (/^\s+$/.test(tok)) {
+      out.push(tok);
+      return;
+    }
+    const j = idx++;
+    out.push(/* @__PURE__ */ React.createElement("span", { key: i, className: "word", style: { animationDelay: j * perWord + "ms" } }, tok));
+  });
+  return out;
+}
 const IconSend = () => /* @__PURE__ */ React.createElement("svg", { viewBox: "0 0 16 16", fill: "none" }, /* @__PURE__ */ React.createElement("path", { d: "M8 13V3M8 3L3.5 7.5M8 3l4.5 4.5", stroke: "currentColor", strokeWidth: "1.8", strokeLinecap: "round", strokeLinejoin: "round" }));
 function Composer({ onSend, disabled }) {
   const [value, setValue] = useState("");
@@ -465,7 +479,7 @@ function Turn({ turn, isLast, busy, leaving, instant, minHeight, spinnerStyle, s
     const streaming = !!(asst && asst.streaming);
     const formatted = formatAssistant(asst.content, streaming, asst.live ? 0 : 26);
     const isLastAsst = index === assistants.length - 1;
-    return /* @__PURE__ */ React.createElement("div", { className: "row-asst", key: asst.id }, /* @__PURE__ */ React.createElement("div", { className: "asst-spinner-slot" + (busy && isLastAsst ? leaving ? " is-leaving" : " is-busy" : "") + (instant && busy && isLastAsst ? " is-instant" : "") }, /* @__PURE__ */ React.createElement("span", { className: "sp-fade" }, /* @__PURE__ */ React.createElement("span", { className: "sp-blink" }, /* @__PURE__ */ React.createElement(Spinner, { kind: spinnerStyle, label: spinnerLabel })))), /* @__PURE__ */ React.createElement("div", { className: "asst-body" + (asst.erasing ? " is-erasing" : "") }, asst.searchLabel ? /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13.5, opacity: 0.65, fontStyle: "italic", marginBottom: formatted ? 8 : 0 } }, "\u{1F50E} \u0438\u0449\u0443 \u0432 \u0438\u043D\u0442\u0435\u0440\u043D\u0435\u0442\u0435: \xAB", asst.searchLabel, "\xBB\u2026") : null, formatted ? formatted.content : null));
+    return /* @__PURE__ */ React.createElement("div", { className: "row-asst", key: asst.id }, /* @__PURE__ */ React.createElement("div", { className: "asst-spinner-slot" + (busy && isLastAsst ? leaving ? " is-leaving" : " is-busy" : "") + (instant && busy && isLastAsst ? " is-instant" : "") }, /* @__PURE__ */ React.createElement("span", { className: "sp-fade" }, /* @__PURE__ */ React.createElement("span", { className: "sp-blink" }, /* @__PURE__ */ React.createElement(Spinner, { kind: spinnerStyle, label: spinnerLabel })))), /* @__PURE__ */ React.createElement("div", { className: "asst-body" + (asst.erasing ? " is-erasing" : "") }, asst.searchLabel != null ? /* @__PURE__ */ React.createElement("div", { className: "search-note", key: asst.searchLabel, style: { marginBottom: formatted ? 8 : 0 } }, streamWords("\u0438\u0449\u0443 \u0432 \u0438\u043D\u0442\u0435\u0440\u043D\u0435\u0442\u0435: \xAB" + asst.searchLabel + "\xBB\u2026", 24)) : null, formatted ? formatted.content : null));
   }), assistants.length === 0 && busy ? /* @__PURE__ */ React.createElement("div", { className: "row-asst" }, /* @__PURE__ */ React.createElement("div", { className: "asst-spinner-slot is-busy" + (instant ? " is-instant" : "") }, /* @__PURE__ */ React.createElement("span", { className: "sp-fade" }, /* @__PURE__ */ React.createElement("span", { className: "sp-blink" }, /* @__PURE__ */ React.createElement(Spinner, { kind: spinnerStyle, label: spinnerLabel })))), /* @__PURE__ */ React.createElement("div", { className: "asst-body" })) : null);
 }
 function EmptyState() {

@@ -148,12 +148,33 @@ def _headers(tokens: dict, session_id: str) -> dict:
     }
 
 
-def _body(messages, instructions, model, effort, verbosity, cache_key) -> dict:
+# Инструмент поиска: модель сама решает, когда искать (бережём лимит Tavily), и
+# ОБЯЗАНА формулировать запрос на английском (перевод намерения пользователя).
+WEB_SEARCH_TOOL = {
+    "type": "function",
+    "name": "web_search",
+    "description": ("Search the web for current, factual or fresh information (news, prices, versions, "
+                    "dates, events, docs — anything that may have changed or you're unsure about). Use it "
+                    "whenever up-to-date or external facts would make the answer better. IMPORTANT: the "
+                    "`query` MUST be written in ENGLISH — translate the user's intent into a concise English "
+                    "query, regardless of the chat language."),
+    "parameters": {
+        "type": "object",
+        "properties": {"query": {"type": "string", "description": "Concise web search query in English"}},
+        "required": ["query"],
+        "additionalProperties": False,
+    },
+    "strict": True,
+}
+MAX_TOOL_HOPS = 4  # до 3 поисков за один ход + финальный ответ
+
+
+def _body(input_items, instructions, model, effort, verbosity, cache_key, tools) -> dict:
     return {
         "model": model,
         "instructions": instructions,
-        "input": _to_input(messages),
-        "tools": [],
+        "input": input_items,
+        "tools": tools,
         "tool_choice": "auto",
         "reasoning": {"effort": effort},
         "store": False,
@@ -183,36 +204,8 @@ async def _refresh_after_401(auth_path, used_access_token):
         return refresh_tokens(data, auth_path)["tokens"]
 
 
-async def stream_chat(messages, *, instructions, model="gpt-5.5", effort="low",
-                      verbosity="medium", cache_key=None, auth_path=AUTH_PATH):
-    """Стримит ответ Наоми. Yield'ит кортежи ('delta', text) и в конце ('done', usage).
-
-    cache_key — стабильный id диалога: одинаковый ключ держит префикс в кеше сервера
-    (ниже латентность). Сессия → один ключ."""
-    tokens = await _fresh_tokens(auth_path)
-    session_id = str(uuid.uuid4())
-    cache_key = cache_key or session_id
-    body = _body(messages, instructions, model, effort, verbosity, cache_key)
-    headers = _headers(tokens, session_id)
-
-    async with httpx.AsyncClient(timeout=httpx.Timeout(connect=15, read=180, write=30, pool=15)) as client:
-        async with client.stream("POST", RESPONSES_URL, json=body, headers=headers) as r:
-            if r.status_code == 401:
-                # токен протух между проверкой и запросом — обновим (под локом) и повторим один раз
-                await r.aread()
-                tokens = await _refresh_after_401(auth_path, tokens["access_token"])
-                headers = _headers(tokens, session_id)
-                async with client.stream("POST", RESPONSES_URL, json=body, headers=headers) as r2:
-                    r2.raise_for_status()
-                    async for item in _parse_sse(r2):
-                        yield item
-                    return
-            r.raise_for_status()
-            async for item in _parse_sse(r):
-                yield item
-
-
-async def _parse_sse(resp):
+async def _parse_events(resp):
+    """Разбор SSE одного ответа: ('delta',t) / ('fc',{call_id,name,arguments}) / ('usage',u) / ('error',ev)."""
     async for line in resp.aiter_lines():
         if not line.startswith("data:"):
             continue
@@ -226,20 +219,86 @@ async def _parse_sse(resp):
         t = ev.get("type", "")
         if t == "response.output_text.delta":
             yield ("delta", ev.get("delta", ""))
+        elif t == "response.output_item.done" and ev.get("item", {}).get("type") == "function_call":
+            it = ev["item"]
+            yield ("fc", {"call_id": it.get("call_id"), "name": it.get("name"), "arguments": it.get("arguments") or ""})
         elif t == "response.completed":
-            usage = ev.get("response", {}).get("usage", {}) or {}
-            yield ("done", usage)
+            yield ("usage", ev.get("response", {}).get("usage", {}) or {})
         elif t in ("response.failed", "error"):
             yield ("error", ev)
 
 
+async def _stream_once(client, session_id, body, tok_holder, auth_path):
+    """Один запрос к responses (с ретраем 401). tok_holder['tokens'] обновляется при refresh."""
+    headers = _headers(tok_holder["tokens"], session_id)
+    async with client.stream("POST", RESPONSES_URL, json=body, headers=headers) as r:
+        if r.status_code == 401:
+            await r.aread()
+            tok_holder["tokens"] = await _refresh_after_401(auth_path, tok_holder["tokens"]["access_token"])
+            async with client.stream("POST", RESPONSES_URL, json=body, headers=_headers(tok_holder["tokens"], session_id)) as r2:
+                r2.raise_for_status()
+                async for ev in _parse_events(r2):
+                    yield ev
+            return
+        r.raise_for_status()
+        async for ev in _parse_events(r):
+            yield ev
+
+
+async def stream_chat(messages, *, instructions, model="gpt-5.5", effort="low",
+                      verbosity="medium", cache_key=None, auth_path=AUTH_PATH, search_fn=None):
+    """Стримит ответ Наоми. Yield'ит ('delta', text), ('tool', {query}) при поиске, в конце ('done', usage).
+
+    Если передан search_fn — у модели появляется инструмент web_search: она сама решает,
+    когда искать, формулирует английский запрос, мы зовём search_fn(query) и возвращаем ей результат."""
+    tok_holder = {"tokens": await _fresh_tokens(auth_path)}
+    session_id = str(uuid.uuid4())
+    cache_key = cache_key or session_id
+    input_items = _to_input(messages)
+    tools = [WEB_SEARCH_TOOL] if search_fn else []
+    usage = {}
+
+    async with httpx.AsyncClient(timeout=httpx.Timeout(connect=15, read=180, write=30, pool=15)) as client:
+        for _ in range(MAX_TOOL_HOPS):
+            body = _body(input_items, instructions, model, effort, verbosity, cache_key, tools)
+            fc = None
+            async for kind, payload in _stream_once(client, session_id, body, tok_holder, auth_path):
+                if kind == "delta":
+                    yield ("delta", payload)
+                elif kind == "fc":
+                    fc = payload
+                elif kind == "usage":
+                    usage = payload
+                elif kind == "error":
+                    yield ("error", payload)
+                    return
+            if fc and search_fn:
+                try:
+                    query = (json.loads(fc["arguments"]) or {}).get("query", "")
+                except Exception:
+                    query = ""
+                yield ("tool", {"name": fc.get("name"), "query": query})
+                try:
+                    output = await search_fn(query)
+                except Exception as e:
+                    output = json.dumps({"error": str(e)}, ensure_ascii=False)
+                input_items = input_items + [
+                    {"type": "function_call", "call_id": fc["call_id"], "name": fc["name"], "arguments": fc["arguments"]},
+                    {"type": "function_call_output", "call_id": fc["call_id"], "output": output},
+                ]
+                continue  # новый запрос с результатом поиска
+            break
+
+    yield ("done", usage)
+
+
 async def complete(messages, *, instructions, model="gpt-5.5", effort="low",
-                   verbosity="medium", cache_key=None, auth_path=AUTH_PATH) -> dict:
-    """Нестриминговый помощник: собирает полный текст ответа и usage."""
+                   verbosity="medium", cache_key=None, auth_path=AUTH_PATH, search_fn=None) -> dict:
+    """Нестриминговый помощник: собирает полный текст ответа и usage (поиск прозрачен)."""
     text, usage = "", {}
     async for kind, payload in stream_chat(messages, instructions=instructions, model=model,
                                            effort=effort, verbosity=verbosity,
-                                           cache_key=cache_key, auth_path=auth_path):
+                                           cache_key=cache_key, auth_path=auth_path, search_fn=search_fn):
         if kind == "delta":
             text += payload
         elif kind == "done":

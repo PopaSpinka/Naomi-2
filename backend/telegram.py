@@ -10,6 +10,7 @@ import os
 import httpx
 
 import oai
+import search
 
 CFG_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "telegram.json")
 API = "https://api.telegram.org/bot{token}/{method}"
@@ -97,6 +98,7 @@ async def run(get_instructions, get_settings, convo, lock, publish):
                                 instructions=get_instructions(),
                                 model=s.get("model", "gpt-5.5"),
                                 effort=s.get("reasoning", "low"),
+                                search_fn=search.search if search.is_configured() else None,
                             )
                             reply = (result.get("text") or "").strip() or "…"
                         except Exception:

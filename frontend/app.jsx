@@ -23,7 +23,7 @@ window.claude = {
     }
   },
   // Реальный стрим ответа: читаем SSE-поток /api/chat и зовём onDelta(текст) по мере прихода.
-  stream: async function(options, onDelta) {
+  stream: async function(options, onDelta, onTool) {
     const controller = new AbortController();
     let timer = setTimeout(() => controller.abort(), 180000);
     const bump = () => { clearTimeout(timer); timer = setTimeout(() => controller.abort(), 180000); };
@@ -50,6 +50,7 @@ window.claude = {
           if (!line) continue;
           let ev; try { ev = JSON.parse(line.slice(5).trim()); } catch (e) { continue; }
           if (ev.t === "delta") onDelta(ev.d);
+          else if (ev.t === "tool") { if (onTool) onTool(ev.q); }
           else if (ev.t === "error") throw new Error("stream error");
         }
       }
@@ -119,11 +120,16 @@ const I18N = {
     "opt.off": "Off", "opt.low": "Low", "opt.medium": "Medium", "opt.high": "High", "opt.max": "Max", "opt.xhigh": "Extra-high",
     "nav.account": "Account", "nav.docs": "Docs",
     "docs.loading": "Loading…",
-    "account.desc": "Naomi runs on your ChatGPT subscription. Sign in once — the token is stored locally and refreshes itself.",
+    "account.desc": "Services connected to Naomi. Each lives here — sign in once, keys are stored locally.",
     "account.connected": "Connected", "account.disconnected": "Not connected",
     "account.plan": "Plan", "account.loginHint": "Sign in with your ChatGPT account to power Naomi.",
     "account.login": "Sign in with ChatGPT", "account.relogin": "Sign in again", "account.waiting": "Waiting for sign-in…",
     "account.error": "Error", "account.browserHint": "A browser tab opened — finish the ChatGPT sign-in there.",
+    "account.save": "Save",
+    "account.tavily": "Web search (Tavily)",
+    "account.tavilyDesc": "Lets Naomi search the web for fresh facts. She decides when to search and queries in English. Free tier ~1000/mo.",
+    "account.tavilyReplace": "Enter a new key to replace…",
+    "account.tavilyGetKey": "Get a key ↗",
     "about.title": "About", "about.tagline": "A living companion you just talk to.",
     "about.creators": "Created by",
     "about.slava": "vision, specs, daily field-testing",
@@ -141,11 +147,16 @@ const I18N = {
     "opt.off": "Выкл", "opt.low": "Низкий", "opt.medium": "Средний", "opt.high": "Высокий", "opt.max": "Макс", "opt.xhigh": "Экстра",
     "nav.account": "Аккаунт", "nav.docs": "Документация",
     "docs.loading": "Загружаю…",
-    "account.desc": "Наоми работает на твоей подписке ChatGPT. Войди один раз — токен хранится локально и сам обновляется.",
+    "account.desc": "Сервисы, подключённые к Наоми. Всё живёт здесь — входишь один раз, ключи хранятся локально.",
     "account.connected": "Подключено", "account.disconnected": "Не подключено",
     "account.plan": "План", "account.loginHint": "Войди через аккаунт ChatGPT, чтобы Наоми заработала.",
     "account.login": "Войти через ChatGPT", "account.relogin": "Войти заново", "account.waiting": "Жду вход…",
     "account.error": "Ошибка", "account.browserHint": "Открылась вкладка браузера — заверши вход в ChatGPT там.",
+    "account.save": "Сохранить",
+    "account.tavily": "Поиск в интернете (Tavily)",
+    "account.tavilyDesc": "Позволяет Наоми искать в интернете свежие факты. Она сама решает, когда искать, и формулирует запрос на английском. Бесплатный тариф ~1000/мес.",
+    "account.tavilyReplace": "Введи новый ключ, чтобы заменить…",
+    "account.tavilyGetKey": "Получить ключ ↗",
     "about.title": "О Наоми", "about.tagline": "Живой компаньон, с которым просто болтаешь.",
     "about.creators": "Создатели",
     "about.slava": "замысел, спеки, ежедневные полевые тесты",
@@ -473,7 +484,7 @@ function Turn({ turn, isLast, busy, leaving, instant, minHeight, spinnerStyle, s
               </span>
             </div>
             <div className={"asst-body" + (asst.erasing ? " is-erasing" : "")}>
-              {asst.taskLabel ? (<div className="task-ref">↳ {asst.taskLabel}</div>) : null}
+              {asst.searchLabel ? (<div style={{ fontSize: 13.5, opacity: 0.65, fontStyle: "italic", marginBottom: formatted ? 8 : 0 }}>🔎 ищу в интернете: «{asst.searchLabel}»…</div>) : null}
               {formatted ? formatted.content : null}
             </div>
           </div>
@@ -527,6 +538,17 @@ function App() {
   const [authInfo, setAuthInfo] = useState(null);
   const [authBusy, setAuthBusy] = useState(false);
   const loadAuth = () => fetch("/api/auth/status").then((r) => r.json()).then(setAuthInfo).catch(() => {});
+  // Tavily (веб-поиск) — часть хаба сервисов во вкладке «Аккаунт».
+  const [tavily, setTavily] = useState(null);
+  const [tavilyKey, setTavilyKey] = useState("");
+  const [tavilyBusy, setTavilyBusy] = useState(false);
+  const loadTavily = () => fetch("/api/services/tavily").then((r) => r.json()).then(setTavily).catch(() => {});
+  const saveTavily = () => {
+    if (!tavilyKey.trim()) return;
+    setTavilyBusy(true);
+    fetch("/api/services/tavily", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ key: tavilyKey.trim() }) })
+      .then((r) => r.json()).then((s) => { setTavily(s); setTavilyKey(""); }).catch(() => {}).finally(() => setTavilyBusy(false));
+  };
   // Документация (вкладка «Документация»): markdown из DOCUMENTATION.md.
   const [docs, setDocs] = useState("");
   const loadDocs = () => fetch("/api/docs").then((r) => r.json()).then((d) => setDocs(d.markdown || "")).catch(() => {});
@@ -725,7 +747,7 @@ function App() {
     const flush = () => {
       pending = false;
       setMessages((prev) => prev.some((m) => m.id === aId)
-        ? prev.map((m) => m.id === aId ? { ...m, content: acc } : m)
+        ? prev.map((m) => m.id === aId ? { ...m, content: acc, searchLabel: null } : m)
         : [...prev, { id: aId, role: "assistant", content: acc, streaming: true, live: true }]);
     };
     const onDelta = (d) => {
@@ -733,11 +755,17 @@ function App() {
       acc += d; started = true;
       if (!pending) { pending = true; requestAnimationFrame(flush); }   // батчим по кадрам экрана
     };
+    // Наоми решила поискать в интернете → показываем индикатор «ищу», пока не пошёл ответ
+    const onTool = (query) => {
+      setMessages((prev) => prev.some((m) => m.id === aId)
+        ? prev.map((m) => m.id === aId ? { ...m, searchLabel: query || "" } : m)
+        : [...prev, { id: aId, role: "assistant", content: "", streaming: true, live: true, searchLabel: query || "" }]);
+    };
 
     try {
       await window.claude.stream(
         { messages: nextMessages.map((m) => ({ role: m.role, content: m.content })), client_turn_id: userId },
-        onDelta
+        onDelta, onTool
       );
       if (pending) flush();                       // долить остаток последнего кадра
       if (!started) {
@@ -831,7 +859,7 @@ function App() {
               <button className="set-x" aria-label="Close" onClick={() => setSettingsOpen(false)}>✕</button>
               <div className="set-side">
                 <button className={"set-nav" + (settingsTab === "agent" ? " active" : "")} onClick={() => setSettingsTab("agent")}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg><span>{L("nav.agent")}</span></button>
-                <button className={"set-nav" + (settingsTab === "account" ? " active" : "")} onClick={() => { setSettingsTab("account"); loadAuth(); }}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zM15.5 7.5l3 3L22 7l-3-3-3.5 3.5z"></path></svg><span>{L("nav.account")}</span></button>
+                <button className={"set-nav" + (settingsTab === "account" ? " active" : "")} onClick={() => { setSettingsTab("account"); loadAuth(); loadTavily(); }}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zM15.5 7.5l3 3L22 7l-3-3-3.5 3.5z"></path></svg><span>{L("nav.account")}</span></button>
                 <button className={"set-nav" + (settingsTab === "docs" ? " active" : "")} onClick={() => { setSettingsTab("docs"); loadDocs(); }}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg><span>{L("nav.docs")}</span></button>
                 <button className={"set-nav" + (settingsTab === "about" ? " active" : "")} style={{ marginTop: "auto" }} onClick={() => setSettingsTab("about")}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg><span>{L("nav.about")}</span></button>
               </div>
@@ -864,7 +892,7 @@ function App() {
                     <p className="set-rd" style={{ margin: "0 0 16px" }}>{L("account.desc")}</p>
                     <div className="set-row">
                       <div>
-                        <p className="set-rt">{authInfo && authInfo.logged_in ? L("account.connected") : L("account.disconnected")}</p>
+                        <p className="set-rt">ChatGPT · {authInfo && authInfo.logged_in ? L("account.connected") : L("account.disconnected")}</p>
                         <p className="set-rd">{authInfo && authInfo.logged_in
                           ? (L("account.plan") + ": " + (authInfo.plan || "—"))
                           : L("account.loginHint")}</p>
@@ -882,6 +910,24 @@ function App() {
                     {authBusy ? (
                       <p className="set-rd" style={{ margin: "10px 0 0" }}>{L("account.browserHint")}</p>
                     ) : null}
+                    <div className="set-row" style={{ display: "block" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                        <span style={{ width: 9, height: 9, borderRadius: "50%", background: tavily && tavily.configured ? "#3fb950" : "#8b8b8b", display: "inline-block" }} />
+                        <p className="set-rt" style={{ margin: 0 }}>{L("account.tavily")}</p>
+                        <span className="set-rd" style={{ margin: 0, fontSize: 12 }}>· {tavily && tavily.configured ? L("account.connected") : L("account.disconnected")}{tavily && tavily.configured && tavily.key_hint ? " (" + tavily.key_hint + ")" : ""}</span>
+                      </div>
+                      <p className="set-rd" style={{ margin: "6px 0 0", fontSize: 12, lineHeight: 1.5 }}>{L("account.tavilyDesc")}</p>
+                      <div style={{ display: "flex", gap: 10, alignItems: "center", marginTop: 10, flexWrap: "wrap" }}>
+                        <input type="password" spellCheck={false} autoComplete="off"
+                          style={{ flex: "1 1 220px", maxWidth: 340, background: "#2b2b28", border: "1px solid rgba(255,255,255,.12)", borderRadius: 8, color: "#ece9e3", font: "inherit", fontSize: 13.5, padding: "7px 10px", outline: "none" }}
+                          value={tavilyKey}
+                          onChange={(e) => setTavilyKey(e.target.value)}
+                          onKeyDown={(e) => { if (e.key === "Enter") saveTavily(); }}
+                          placeholder={tavily && tavily.configured ? L("account.tavilyReplace") : "tvly-..."} />
+                        <button className="set-btn" onClick={saveTavily} disabled={tavilyBusy || !tavilyKey.trim()}>{L("account.save")}</button>
+                        <a href="https://app.tavily.com" target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, color: "#4a9eff", textDecoration: "none" }}>{L("account.tavilyGetKey")}</a>
+                      </div>
+                    </div>
                   </React.Fragment>
                 ) : settingsTab === "docs" ? (
                   <React.Fragment>

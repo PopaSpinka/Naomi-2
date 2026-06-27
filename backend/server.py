@@ -14,6 +14,7 @@ from fastapi.staticfiles import StaticFiles
 
 import auth
 import oai
+import search
 import telegram
 
 # --- пути ---
@@ -29,7 +30,7 @@ SETTINGS_FILE = os.path.join(DATA, "settings.json")
 SESSION_FILE = os.path.join(DATA, "session.json")
 
 DEFAULT_SETTINGS = {"model": "gpt-5.5", "reasoning": "low"}
-VERSION = "naomi-0.3.2"
+VERSION = "naomi-0.4.0"
 
 app = FastAPI()
 
@@ -118,6 +119,7 @@ async def chat(req: Request):
         async with _convo_lock:
             CONVO.append({"role": "user", "content": user_text})
             full = ""
+            sfn = search.search if search.is_configured() else None
             try:
                 async for kind, part in oai.stream_chat(
                     CONVO,
@@ -125,10 +127,14 @@ async def chat(req: Request):
                     model=cfg.get("model", "gpt-5.5"),
                     effort=cfg.get("reasoning", "low"),
                     cache_key=cache_key(),
+                    search_fn=sfn,
                 ):
                     if kind == "delta" and part:
                         full += part
                         yield "data: " + json.dumps({"t": "delta", "d": part}, ensure_ascii=False) + "\n\n"
+                    elif kind == "tool":
+                        # «Наоми ищет в интернете» → фронт покажет индикатор
+                        yield "data: " + json.dumps({"t": "tool", "q": part.get("query", "")}, ensure_ascii=False) + "\n\n"
                     elif kind == "error":
                         break
             except Exception:
@@ -156,6 +162,23 @@ async def reset():
     async with _convo_lock:
         CONVO.clear()   # очистка на месте: телеграм-поллер держит ссылку на этот же список
     return {"ok": True}
+
+
+@app.get("/api/services/tavily")
+async def tavily_status():
+    """Статус поиска Tavily для вкладки «Аккаунт» (ключ наружу не отдаём)."""
+    return search.status()
+
+
+@app.post("/api/services/tavily")
+async def tavily_save(req: Request):
+    """Сохранить/обновить ключ Tavily (в data/services.json — вне git)."""
+    try:
+        body = await req.json()
+    except Exception:
+        return JSONResponse({"error": "bad json"}, status_code=400)
+    search.save_key((body.get("key") or "").strip())
+    return search.status()
 
 
 @app.get("/api/settings")

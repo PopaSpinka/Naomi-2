@@ -824,7 +824,7 @@ function App() {
     setStatsOpen(false);
     loadHome();
   } }, /* @__PURE__ */ React.createElement("svg", { width: "18", height: "18", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.7", strokeLinecap: "round", strokeLinejoin: "round" }, /* @__PURE__ */ React.createElement("path", { d: "M3 10.5L12 3l9 7.5" }), /* @__PURE__ */ React.createElement("path", { d: "M5 9.5V20a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V9.5" }), /* @__PURE__ */ React.createElement("path", { d: "M9.5 21v-6h5v6" }))), /* @__PURE__ */ React.createElement("button", { className: "ghost-btn", "aria-label": "\u041E\u0447\u0438\u0441\u0442\u0438\u0442\u044C \u0447\u0430\u0442", title: "\u041E\u0447\u0438\u0441\u0442\u0438\u0442\u044C \u0447\u0430\u0442", onClick: () => {
-    fetch("/api/reset", { method: "POST" }).catch(() => {
+    fetch("/api/reset", { method: "POST" }).then(loadStats).catch(() => {
     });
     setMessages([]);
     setBusyTurns(/* @__PURE__ */ new Set());

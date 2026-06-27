@@ -36,7 +36,7 @@ SETTINGS_FILE = os.path.join(DATA, "settings.json")
 SESSION_FILE = os.path.join(DATA, "session.json")
 
 DEFAULT_SETTINGS = {"model": "gpt-5.5", "reasoning": "low"}
-VERSION = "naomi-0.9.2"
+VERSION = "naomi-0.9.3"
 
 app = FastAPI()
 
@@ -171,9 +171,11 @@ async def history():
 
 @app.post("/api/reset")
 async def reset():
-    """Полностью очищает общий тред (веб + контекст для телеграма) — Наоми забывает разговор."""
+    """Полностью очищает общий тред (веб + контекст для телеграма) — Наоми забывает разговор.
+    Заодно обнуляет статистику токенов (мусорка = новая сессия)."""
     async with _convo_lock:
         CONVO.clear()   # очистка на месте: телеграм-поллер держит ссылку на этот же список
+    stats.reset()
     return {"ok": True}
 
 

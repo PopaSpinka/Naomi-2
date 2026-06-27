@@ -13,6 +13,12 @@ _s = {
 }
 
 
+def reset() -> None:
+    """Обнулить счётчики — зовётся при очистке чата (мусорка = новая сессия)."""
+    for k in _s:
+        _s[k] = 0
+
+
 def record(usage: dict) -> None:
     if not usage:
         return

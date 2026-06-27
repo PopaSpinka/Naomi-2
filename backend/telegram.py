@@ -12,6 +12,7 @@ import httpx
 import home
 import oai
 import search
+import stats
 
 # Наоми пишет обычным markdown (**жирный**, списки, `код`), а у Телеграма свой
 # диалог — MarkdownV2 со строгим экранированием. Конвертируем перед отправкой.
@@ -150,6 +151,7 @@ async def run(get_instructions, get_settings, convo, lock, publish):
                                 search_fn=search.search if search.is_configured() else None,
                                 context_note=home.build_context_note(),   # время + состояние дома
                             )
+                            stats.record(result.get("usage"))   # токены телеграма — в общий счёт сессии
                             reply = (result.get("text") or "").strip() or "…"
                         except Exception:
                             reply = "Ой, что-то пошло не так — попробуй ещё раз 🤍"

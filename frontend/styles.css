@@ -691,3 +691,9 @@ body[data-theme="light"] {
 .home-cycle:hover { background: #2e2e2a; }
 .home-head-t { display: inline-flex; align-items: center; gap: 9px; }
 .home-head-t svg { opacity: .9; flex: 0 0 auto; }
+
+/* ─── Панель статистики (тот же док, что и умный дом) ─── */
+.stat-big { display: flex; flex-direction: column; gap: 2px; padding: 4px 0 2px; }
+.stat-big b { font-size: 30px; font-weight: 600; color: #ece9e3; font-variant-numeric: tabular-nums; letter-spacing: -0.01em; line-height: 1.1; }
+.stat-big span { font-size: 12.5px; color: #8b877f; }
+.stat-v { color: #ece9e3; font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; }

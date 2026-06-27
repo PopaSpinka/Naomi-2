@@ -20,6 +20,7 @@ import auth
 import home
 import oai
 import search
+import stats
 import telegram
 
 # --- пути ---
@@ -35,7 +36,7 @@ SETTINGS_FILE = os.path.join(DATA, "settings.json")
 SESSION_FILE = os.path.join(DATA, "session.json")
 
 DEFAULT_SETTINGS = {"model": "gpt-5.5", "reasoning": "low"}
-VERSION = "naomi-0.9.0"
+VERSION = "naomi-0.9.1"
 
 app = FastAPI()
 
@@ -145,6 +146,8 @@ async def chat(req: Request):
                     elif kind == "tool":
                         # «Наоми ищет в интернете» → фронт покажет индикатор
                         yield "data: " + json.dumps({"t": "tool", "q": part.get("query", "")}, ensure_ascii=False) + "\n\n"
+                    elif kind == "done":
+                        stats.record(part)   # копим токены за сессию (usage из responses-API)
                     elif kind == "error":
                         break
             except Exception:
@@ -205,6 +208,12 @@ async def set_home(req: Request):
     except Exception:
         return JSONResponse({"error": "bad json"}, status_code=400)
     return home.update(body)
+
+
+@app.get("/api/stats")
+async def get_stats():
+    """Токены за сессию для панели статистики."""
+    return stats.snapshot()
 
 
 @app.get("/api/settings")

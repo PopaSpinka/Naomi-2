@@ -578,6 +578,30 @@ function HRow({ label, children }) {
   return <div className="home-row"><span className="home-row-l">{label}</span><span className="home-row-c">{children}</span></div>;
 }
 
+function fmtNum(n) { return (n == null ? 0 : n).toLocaleString("ru-RU"); }
+
+// Панель статистики токенов за сессию — тот же правый док, что и умный дом.
+function StatsPanel({ open, stats, onClose }) {
+  const s = stats || {};
+  return (
+    <aside className={"home-panel" + (open ? " open" : "")} aria-hidden={!open}>
+      <div className="home-head"><span className="home-head-t"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>Статистика</span><button className="home-x" onClick={onClose} aria-label="Закрыть">✕</button></div>
+      <div className="home-body">
+        <div className="home-sec">
+          <div className="home-sec-h">Текущий запрос</div>
+          <div className="stat-big"><b>{fmtNum(s.last_input)}</b><span>токенов уходит каждый раз</span></div>
+        </div>
+        <div className="home-sec">
+          <div className="home-sec-h">За сессию</div>
+          <HRow label="Всего токенов"><span className="stat-v">{fmtNum(s.total)}</span></HRow>
+          <HRow label="Кешировано"><span className="stat-v">{fmtNum(s.cached)}</span></HRow>
+          <HRow label="Процент кеша"><span className="stat-v">{s.cached_pct != null ? s.cached_pct + "%" : "—"}</span></HRow>
+        </div>
+      </div>
+    </aside>
+  );
+}
+
 function HomePanel({ open, home, onPatch, onClose }) {
   const h = home || {};
   const people = h.people || {}, ac = h.ac || {}, weather = h.weather || {}, indoor = h.indoor || {}, vac = h.vacuum || {}, toilet = h.toilet || {};
@@ -685,6 +709,16 @@ function App() {
     fetch("/api/home", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(patch) })
       .then((r) => r.json()).then(setHome).catch(() => {});
   };
+  // Статистика токенов за сессию (правый док, как у умного дома). Поллим, пока открыта.
+  const [statsOpen, setStatsOpen] = useState(false);
+  const [stats, setStats] = useState(null);
+  const loadStats = () => fetch("/api/stats").then((r) => r.json()).then(setStats).catch(() => {});
+  useEffect(() => {
+    if (!statsOpen) return;
+    loadStats();
+    const id = setInterval(loadStats, 1500);
+    return () => clearInterval(id);
+  }, [statsOpen]);
   const startLogin = () => {
     setAuthBusy(true);
     fetch("/api/auth/login", { method: "POST" }).then((r) => r.json()).then((d) => {
@@ -932,7 +966,8 @@ function App() {
           </div>
         </div>
         <div className="hdr-r">
-          <button className={"ghost-btn" + (homeOpen ? " is-on" : "")} aria-label="Умный дом" title="Умный дом" onClick={() => { setHomeOpen((v) => !v); loadHome(); }}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M3 10.5L12 3l9 7.5"></path><path d="M5 9.5V20a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V9.5"></path><path d="M9.5 21v-6h5v6"></path></svg></button>
+          <button className={"ghost-btn" + (statsOpen ? " is-on" : "")} aria-label="Статистика" title="Статистика" onClick={() => { setStatsOpen((v) => !v); setHomeOpen(false); }}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg></button>
+          <button className={"ghost-btn" + (homeOpen ? " is-on" : "")} aria-label="Умный дом" title="Умный дом" onClick={() => { setHomeOpen((v) => !v); setStatsOpen(false); loadHome(); }}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M3 10.5L12 3l9 7.5"></path><path d="M5 9.5V20a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V9.5"></path><path d="M9.5 21v-6h5v6"></path></svg></button>
           <button className="ghost-btn" aria-label="Очистить чат" title="Очистить чат" onClick={() => { fetch("/api/reset", { method: "POST" }).catch(() => {}); setMessages([]); setBusyTurns(new Set()); setFadingTurns(new Set()); setInstantTurns(new Set()); }}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"></path><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg></button>
           <button className="ghost-btn" aria-label="Settings" title="Settings" onClick={() => { setSettingsOpen(true); loadSettings(); }}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg></button>
         </div>
@@ -964,6 +999,8 @@ function App() {
       {version ? <div className="version-badge" title="Текущая версия (git HEAD)">{version}</div> : null}
 
       <HomePanel open={homeOpen} home={home} onPatch={patchHome} onClose={() => setHomeOpen(false)} />
+
+      <StatsPanel open={statsOpen} stats={stats} onClose={() => setStatsOpen(false)} />
 
       <TweaksPanel title="Tweaks">
         <TweakSection label="Внешний вид" />

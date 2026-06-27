@@ -16,6 +16,50 @@ window.claude = {
     } finally {
       clearTimeout(timer);
     }
+  },
+  // Реальный стрим ответа: читаем SSE-поток /api/chat и зовём onDelta(текст) по мере прихода.
+  stream: async function(options, onDelta) {
+    const controller = new AbortController();
+    let timer = setTimeout(() => controller.abort(), 18e4);
+    const bump = () => {
+      clearTimeout(timer);
+      timer = setTimeout(() => controller.abort(), 18e4);
+    };
+    try {
+      const resp = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(options),
+        signal: controller.signal
+      });
+      if (!resp.ok || !resp.body) throw new Error("API call failed: " + resp.statusText);
+      const reader = resp.body.getReader();
+      const dec = new TextDecoder();
+      let buf = "";
+      for (; ; ) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        bump();
+        buf += dec.decode(value, { stream: true });
+        let i;
+        while ((i = buf.indexOf("\n\n")) >= 0) {
+          const frame = buf.slice(0, i);
+          buf = buf.slice(i + 2);
+          const line = frame.split("\n").find((l) => l.indexOf("data:") === 0);
+          if (!line) continue;
+          let ev;
+          try {
+            ev = JSON.parse(line.slice(5).trim());
+          } catch (e) {
+            continue;
+          }
+          if (ev.t === "delta") onDelta(ev.d);
+          else if (ev.t === "error") throw new Error("stream error");
+        }
+      }
+    } finally {
+      clearTimeout(timer);
+    }
   }
 };
 const { useState, useEffect, useRef, useMemo, useLayoutEffect } = React;
@@ -351,9 +395,9 @@ function renderProseBlock(block, key, ctx) {
   flushList();
   return /* @__PURE__ */ React.createElement(React.Fragment, { key }, out);
 }
-function formatAssistant(text, streaming) {
+function formatAssistant(text, streaming, perWord) {
   if (!text) return null;
-  const ctx = { streaming: !!streaming, idx: 0, key: 0, perWord: 26 };
+  const ctx = { streaming: !!streaming, idx: 0, key: 0, perWord: perWord != null ? perWord : 26 };
   const rendered = [];
   splitFences(text).forEach((seg, si) => {
     if (seg.type === "code") {
@@ -407,7 +451,7 @@ function Turn({ turn, isLast, busy, leaving, instant, minHeight, spinnerStyle, s
   const assistants = turn.assistants || [];
   return /* @__PURE__ */ React.createElement("div", { className: "turn", "data-turn-id": turn.id, style: isLast && minHeight && turn.user ? { minHeight } : void 0 }, turn.user ? /* @__PURE__ */ React.createElement("div", { className: "row-user", style: { fontFamily: "Geist" } }, /* @__PURE__ */ React.createElement("div", { className: "bubble-user" }, turn.user.content)) : null, assistants.map((asst, index) => {
     const streaming = !!(asst && asst.streaming);
-    const formatted = formatAssistant(asst.content, streaming);
+    const formatted = formatAssistant(asst.content, streaming, asst.live ? 0 : 26);
     const isLastAsst = index === assistants.length - 1;
     return /* @__PURE__ */ React.createElement("div", { className: "row-asst", key: asst.id }, /* @__PURE__ */ React.createElement("div", { className: "asst-spinner-slot" + (busy && isLastAsst ? leaving ? " is-leaving" : " is-busy" : "") + (instant && busy && isLastAsst ? " is-instant" : "") }, /* @__PURE__ */ React.createElement("span", { className: "sp-fade" }, /* @__PURE__ */ React.createElement("span", { className: "sp-blink" }, /* @__PURE__ */ React.createElement(Spinner, { kind: spinnerStyle, label: spinnerLabel })))), /* @__PURE__ */ React.createElement("div", { className: "asst-body" + (asst.erasing ? " is-erasing" : "") }, asst.taskLabel ? /* @__PURE__ */ React.createElement("div", { className: "task-ref" }, "\u21B3 ", asst.taskLabel) : null, formatted ? formatted.content : null));
   }), assistants.length === 0 && busy ? /* @__PURE__ */ React.createElement("div", { className: "row-asst" }, /* @__PURE__ */ React.createElement("div", { className: "asst-spinner-slot is-busy" + (instant ? " is-instant" : "") }, /* @__PURE__ */ React.createElement("span", { className: "sp-fade" }, /* @__PURE__ */ React.createElement("span", { className: "sp-blink" }, /* @__PURE__ */ React.createElement(Spinner, { kind: spinnerStyle, label: spinnerLabel })))), /* @__PURE__ */ React.createElement("div", { className: "asst-body" })) : null);
@@ -658,41 +702,51 @@ function App() {
     if (agentCfg.reasoning === "off") setAdd(setInstantTurns, userId);
     else setDel(setInstantTurns, userId);
     lastSubmittedRef.current = userId;
+    const aId = nid("a");
+    let acc = "";
+    let started = false;
+    let pending = false;
+    const flush = () => {
+      pending = false;
+      setMessages((prev) => prev.some((m) => m.id === aId) ? prev.map((m) => m.id === aId ? { ...m, content: acc } : m) : [...prev, { id: aId, role: "assistant", content: acc, streaming: true, live: true }]);
+    };
+    const onDelta = (d) => {
+      if (!d) return;
+      acc += d;
+      started = true;
+      if (!pending) {
+        pending = true;
+        requestAnimationFrame(flush);
+      }
+    };
     try {
-      const reply = await window.claude.complete({
-        messages: nextMessages.map((m) => ({ role: m.role, content: m.content })),
-        client_turn_id: userId
-      });
-      const replyObj = reply && typeof reply === "object" ? reply : null;
-      if (replyObj && replyObj.silent) {
+      await window.claude.stream(
+        { messages: nextMessages.map((m) => ({ role: m.role, content: m.content })), client_turn_id: userId },
+        onDelta
+      );
+      if (pending) flush();
+      if (!started) {
+        setMessages((prev) => [...prev, { id: nid("a"), role: "assistant", content: L("err.noReply") }]);
+      } else {
+        setTimeout(() => setMessages((prev) => prev.map((m) => m.id === aId ? { ...m, streaming: false } : m)), 450);
+      }
+      setTimeout(() => setAdd(setFadingTurns, userId), 500);
+      setTimeout(() => {
         setDel(setBusyTurns, userId);
         setDel(setFadingTurns, userId);
-        setDel(setInstantTurns, userId);
-        return;
-      }
-      const replyVal = replyObj ? replyObj.reply : reply;
-      const replyText = typeof replyVal === "string" ? replyVal : String(replyVal);
-      const aId = nid("a");
-      setMessages((prev) => [...prev, { id: aId, role: "assistant", content: replyText, streaming: true }]);
-      const totalMs = countWords(replyText) * 26 + 560;
-      if (replyObj && replyObj.thought) setDel(setInstantTurns, userId);
-      else setAdd(setInstantTurns, userId);
-      setTimeout(() => {
-        setMessages((prev) => prev.map((m) => m.id === aId ? { ...m, streaming: false } : m));
-        setTimeout(() => setAdd(setFadingTurns, userId), 500);
-        setTimeout(() => {
-          setDel(setBusyTurns, userId);
-          setDel(setFadingTurns, userId);
-          setDel(setInstantTurns, userId);
-        }, 500 + 380);
-      }, totalMs);
+      }, 900);
     } catch (err) {
-      setMessages((prev) => [...prev, { id: nid("a"), role: "assistant", content: L("err.noReply") }]);
+      if (pending) flush();
+      if (!started) {
+        setMessages((prev) => [...prev, { id: nid("a"), role: "assistant", content: L("err.noReply") }]);
+      } else {
+        setMessages((prev) => prev.map((m) => m.id === aId ? { ...m, streaming: false } : m));
+      }
       setDel(setBusyTurns, userId);
       setDel(setFadingTurns, userId);
-      setDel(setInstantTurns, userId);
     } finally {
       setThinking(false);
+      setDel(setInstantTurns, userId);
     }
   }
   const lastTurnMinHeight = Math.max(280, scrollH - 16 - 190);

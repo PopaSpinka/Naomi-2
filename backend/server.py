@@ -111,26 +111,37 @@ async def chat(req: Request):
         return JSONResponse({"error": "no messages"}, status_code=400)
 
     cfg = load_settings()
-    async with _convo_lock:
-        CONVO.append({"role": "user", "content": user_text})
-        try:
-            result = await oai.complete(
-                CONVO,
-                instructions=build_instructions(),
-                model=cfg.get("model", "gpt-5.5"),
-                effort=cfg.get("reasoning", "low"),
-                cache_key=cache_key(),
-            )
-            text = (result.get("text") or "").strip()
-        except Exception:
-            CONVO.pop()  # откатываем неотвеченную реплику
-            return JSONResponse({"error": "upstream error"}, status_code=502)
-        if not text:
-            CONVO.pop()
-            return JSONResponse({"error": "empty reply"}, status_code=502)
-        CONVO.append({"role": "assistant", "content": text})
-    # веб НЕ зеркалим в телеграм и не публикуем в SSE (клиент уже показал у себя)
-    return {"reply": text, "thought": cfg.get("reasoning", "low") != "off", "usage": result.get("usage")}
+
+    async def gen():
+        # Стримим токены Наоми по мере генерации (SSE). Тред под локом — как и нестрим-версия.
+        # Веб НЕ зеркалим в телеграм и не публикуем в /api/events (клиент рисует у себя сам).
+        async with _convo_lock:
+            CONVO.append({"role": "user", "content": user_text})
+            full = ""
+            try:
+                async for kind, part in oai.stream_chat(
+                    CONVO,
+                    instructions=build_instructions(),
+                    model=cfg.get("model", "gpt-5.5"),
+                    effort=cfg.get("reasoning", "low"),
+                    cache_key=cache_key(),
+                ):
+                    if kind == "delta" and part:
+                        full += part
+                        yield "data: " + json.dumps({"t": "delta", "d": part}, ensure_ascii=False) + "\n\n"
+                    elif kind == "error":
+                        break
+            except Exception:
+                pass
+            full = full.strip()
+            if full:
+                CONVO.append({"role": "assistant", "content": full})
+                yield "data: " + json.dumps({"t": "done"}) + "\n\n"
+            else:
+                CONVO.pop()  # ничего не пришло — откатываем реплику
+                yield "data: " + json.dumps({"t": "error"}) + "\n\n"
+
+    return StreamingResponse(gen(), media_type="text/event-stream")
 
 
 @app.get("/api/history")

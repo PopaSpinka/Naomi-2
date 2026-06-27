@@ -21,6 +21,41 @@ window.claude = {
     } finally {
       clearTimeout(timer);
     }
+  },
+  // Реальный стрим ответа: читаем SSE-поток /api/chat и зовём onDelta(текст) по мере прихода.
+  stream: async function(options, onDelta) {
+    const controller = new AbortController();
+    let timer = setTimeout(() => controller.abort(), 180000);
+    const bump = () => { clearTimeout(timer); timer = setTimeout(() => controller.abort(), 180000); };
+    try {
+      const resp = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(options),
+        signal: controller.signal
+      });
+      if (!resp.ok || !resp.body) throw new Error("API call failed: " + resp.statusText);
+      const reader = resp.body.getReader();
+      const dec = new TextDecoder();
+      let buf = "";
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        bump();
+        buf += dec.decode(value, { stream: true });
+        let i;
+        while ((i = buf.indexOf("\n\n")) >= 0) {
+          const frame = buf.slice(0, i); buf = buf.slice(i + 2);
+          const line = frame.split("\n").find((l) => l.indexOf("data:") === 0);
+          if (!line) continue;
+          let ev; try { ev = JSON.parse(line.slice(5).trim()); } catch (e) { continue; }
+          if (ev.t === "delta") onDelta(ev.d);
+          else if (ev.t === "error") throw new Error("stream error");
+        }
+      }
+    } finally {
+      clearTimeout(timer);
+    }
   }
 };
 // chat-app — inlined to avoid babel async-load races
@@ -349,9 +384,9 @@ function renderProseBlock(block, key, ctx) {
   return <React.Fragment key={key}>{out}</React.Fragment>;
 }
 
-function formatAssistant(text, streaming) {
+function formatAssistant(text, streaming, perWord) {
   if (!text) return null;
-  const ctx = { streaming: !!streaming, idx: 0, key: 0, perWord: 26 };
+  const ctx = { streaming: !!streaming, idx: 0, key: 0, perWord: perWord != null ? perWord : 26 };
   const rendered = [];
   splitFences(text).forEach((seg, si) => {
     if (seg.type === "code") {
@@ -426,7 +461,7 @@ function Turn({ turn, isLast, busy, leaving, instant, minHeight, spinnerStyle, s
       ) : null}
       {assistants.map((asst, index) => {
         const streaming = !!(asst && asst.streaming);
-        const formatted = formatAssistant(asst.content, streaming);
+        const formatted = formatAssistant(asst.content, streaming, asst.live ? 0 : 26);
         const isLastAsst = index === assistants.length - 1;
         return (
           <div className="row-asst" key={asst.id}>
@@ -681,42 +716,49 @@ function App() {
     if (agentCfg.reasoning === "off") setAdd(setInstantTurns, userId); else setDel(setInstantTurns, userId);
     lastSubmittedRef.current = userId;
 
+    // Системный промпт и история — во владении бэкенда (личность Naomi живёт там);
+    // клиент шлёт только видимые сообщения, сервер берёт из них последнее пользовательское.
+    const aId = nid("a");
+    let acc = "";            // накопленный текст ответа
+    let started = false;     // пришёл ли первый токен
+    let pending = false;     // запланирован ли флэш в этот кадр
+    const flush = () => {
+      pending = false;
+      setMessages((prev) => prev.some((m) => m.id === aId)
+        ? prev.map((m) => m.id === aId ? { ...m, content: acc } : m)
+        : [...prev, { id: aId, role: "assistant", content: acc, streaming: true, live: true }]);
+    };
+    const onDelta = (d) => {
+      if (!d) return;
+      acc += d; started = true;
+      if (!pending) { pending = true; requestAnimationFrame(flush); }   // батчим по кадрам экрана
+    };
+
     try {
-      // Системный промпт и история — во владении бэкенда (личность Naomi живёт там);
-      // клиент шлёт только видимые сообщения, сервер берёт из них последнее пользовательское.
-      const reply = await window.claude.complete({
-        messages: nextMessages.map((m) => ({ role: m.role, content: m.content })),
-        client_turn_id: userId
-      });
-      const replyObj = reply && typeof reply === "object" ? reply : null;
-      // Право промолчать: Наоми выбрала не отвечать — ассистентского сообщения нет, просто гасим
-      // спиннер. Реплика пользователя остаётся как есть (как «ок» без ответа в переписке).
-      if (replyObj && replyObj.silent) {
-        setDel(setBusyTurns, userId); setDel(setFadingTurns, userId);
-        setDel(setInstantTurns, userId);
-        return;
+      await window.claude.stream(
+        { messages: nextMessages.map((m) => ({ role: m.role, content: m.content })), client_turn_id: userId },
+        onDelta
+      );
+      if (pending) flush();                       // долить остаток последнего кадра
+      if (!started) {
+        setMessages((prev) => [...prev, { id: nid("a"), role: "assistant", content: L("err.noReply") }]);
+      } else {
+        // дать последним словам доанимироваться, затем убрать стрим-слой (фикс субпиксельного джиттера)
+        setTimeout(() => setMessages((prev) => prev.map((m) => m.id === aId ? { ...m, streaming: false } : m)), 450);
       }
-      const replyVal = replyObj ? replyObj.reply : reply;
-      const replyText = typeof replyVal === "string" ? replyVal : String(replyVal);
-      const aId = nid("a");
-      setMessages((prev) => [...prev, { id: aId, role: "assistant", content: replyText, streaming: true }]);
-      const totalMs = countWords(replyText) * 26 + 560;
-      // Чат-ответ: красим по ФАКТУ — думала (thought) → жёлтый, без раздумий → зелёный.
-      if (replyObj && replyObj.thought) setDel(setInstantTurns, userId); else setAdd(setInstantTurns, userId);
-      setTimeout(() => {
-        setMessages((prev) => prev.map((m) => m.id === aId ? { ...m, streaming: false } : m));
-        // keep the spinner in place for half a second after the text finishes,
-        // then fade it out (it lives below the answer, so nothing shifts).
-        setTimeout(() => setAdd(setFadingTurns, userId), 500);
-        setTimeout(() => { setDel(setBusyTurns, userId); setDel(setFadingTurns, userId); setDel(setInstantTurns, userId); }, 500 + 380);
-      }, totalMs);
+      setTimeout(() => setAdd(setFadingTurns, userId), 500);
+      setTimeout(() => { setDel(setBusyTurns, userId); setDel(setFadingTurns, userId); }, 900);
     } catch (err) {
-      setMessages((prev) => [...prev, { id: nid("a"), role: "assistant", content: L("err.noReply") }]);
-      setDel(setBusyTurns, userId);
-      setDel(setFadingTurns, userId);
-      setDel(setInstantTurns, userId);
+      if (pending) flush();
+      if (!started) {
+        setMessages((prev) => [...prev, { id: nid("a"), role: "assistant", content: L("err.noReply") }]);
+      } else {
+        setMessages((prev) => prev.map((m) => m.id === aId ? { ...m, streaming: false } : m));
+      }
+      setDel(setBusyTurns, userId); setDel(setFadingTurns, userId);
     } finally {
       setThinking(false);
+      setDel(setInstantTurns, userId);
     }
   }
 

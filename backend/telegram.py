@@ -42,6 +42,77 @@ async def _send(client, token, chat_id, text):
         await _api(client, token, "sendMessage", chat_id=chat_id, text=text[i:i + MSG_LIMIT])
 
 
+# Живой стрим: правим одно сообщение по мере генерации (эффект «печати»).
+# У Телеграма нет токен-стрима — это делается частыми editMessageText. Правки
+# лимитированы (безопасно ~1/сек на сообщение, обе edit-операции в одном ведре),
+# поэтому флашим не чаще EDIT_INTERVAL и уважаем retry_after при 429.
+EDIT_INTERVAL = 1.1
+SEARCH_HINT = "ищу в интернете…"
+
+
+async def _stream_reply(client, token, chat_id, convo, *, instructions, model, effort, search_fn):
+    """Прогрессивно дописывает один ответ Наоми в чат. Возвращает финальный текст,
+    либо None — если стрим не удалось даже начать (вызывающий сделает обычный ответ)."""
+    loop = asyncio.get_running_loop()
+    init = await _api(client, token, "sendMessage", chat_id=chat_id, text="…")
+    if not init.get("ok"):
+        return None
+    mid = init["result"]["message_id"]
+
+    acc = ""              # накопленный текст ответа
+    shown = "…"           # что сейчас отрисовано в сообщении
+    searching = False     # идёт веб-поиск → показываем статус вместо текста
+    last_edit = loop.time() - EDIT_INTERVAL   # чтобы первый кусок показать сразу
+
+    async def flush(force=False):
+        nonlocal last_edit, shown
+        if searching:
+            text = (acc + "\n\n" + SEARCH_HINT) if acc else SEARCH_HINT
+        else:
+            text = acc
+        text = (text.strip()[:MSG_LIMIT]) or "…"
+        if text == shown:
+            return
+        if not force and (loop.time() - last_edit) < EDIT_INTERVAL:
+            return
+        r = await _api(client, token, "editMessageText", chat_id=chat_id, message_id=mid, text=text)
+        if not r.get("ok"):
+            ra = (r.get("parameters") or {}).get("retry_after")
+            if ra:
+                await asyncio.sleep(min(ra, 10) + 0.3)   # флуд-вейт — подождём и попробуем позже
+            return
+        shown, last_edit = text, loop.time()
+
+    try:
+        async for kind, part in oai.stream_chat(convo, instructions=instructions, model=model,
+                                                effort=effort, search_fn=search_fn):
+            if kind == "tool":
+                searching = True
+                await flush(force=True)          # сразу покажем «ищу…»
+            elif kind == "delta" and part:
+                searching = False                # пошёл ответ — гасим статус
+                acc += part
+                await flush()
+            elif kind == "error":
+                break
+    except Exception:
+        pass
+
+    acc = acc.strip()
+    if not acc:
+        err = "Ой, что-то пошло не так — попробуй ещё раз 🤍"
+        await _api(client, token, "editMessageText", chat_id=chat_id, message_id=mid, text=err)
+        return err
+
+    # финал: гарантированно дорисуем полный текст (с учётом лимита 4096)
+    chunks = [acc[i:i + MSG_LIMIT] for i in range(0, len(acc), MSG_LIMIT)]
+    if chunks[0] != shown:
+        await _api(client, token, "editMessageText", chat_id=chat_id, message_id=mid, text=chunks[0])
+    for extra in chunks[1:]:
+        await _api(client, token, "sendMessage", chat_id=chat_id, text=extra)
+    return acc
+
+
 async def run(get_instructions, get_settings, convo, lock, publish):
     """Запускается из server.py на старте.
 
@@ -89,22 +160,33 @@ async def run(get_instructions, get_settings, convo, lock, publish):
                         pass
 
                     s = get_settings()
+                    sfn = search.search if search.is_configured() else None
                     async with lock:
                         convo.append({"role": "user", "content": text})
                         await publish({"type": "incoming", "role": "user", "content": text})   # реплика → в веб live
                         try:
-                            result = await oai.complete(
-                                convo,
+                            reply = await _stream_reply(
+                                client, token, chat_id, convo,
                                 instructions=get_instructions(),
                                 model=s.get("model", "gpt-5.5"),
                                 effort=s.get("reasoning", "low"),
-                                search_fn=search.search if search.is_configured() else None,
+                                search_fn=sfn,
                             )
-                            reply = (result.get("text") or "").strip() or "…"
                         except Exception:
-                            reply = "Ой, что-то пошло не так — попробуй ещё раз 🤍"
+                            reply = None
+                        if reply is None:
+                            # стрим не стартовал — обычный полный ответ, чтобы не молчать
+                            try:
+                                result = await oai.complete(
+                                    convo, instructions=get_instructions(),
+                                    model=s.get("model", "gpt-5.5"), effort=s.get("reasoning", "low"),
+                                    search_fn=sfn,
+                                )
+                                reply = (result.get("text") or "").strip() or "…"
+                            except Exception:
+                                reply = "Ой, что-то пошло не так — попробуй ещё раз 🤍"
+                            await _send(client, token, chat_id, reply)
                         convo.append({"role": "assistant", "content": reply})
                         await publish({"type": "incoming", "role": "assistant", "content": reply})  # ответ → в веб live
-                    await _send(client, token, chat_id, reply)
             except Exception:
                 await asyncio.sleep(3)  # сетевой сбой/таймаут — подождём и продолжим

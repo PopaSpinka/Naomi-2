@@ -298,20 +298,6 @@ function renderProseBlock(block, key, ctx) {
     const Tag = lvl <= 1 ? "h2" : lvl === 2 ? "h3" : "h4";
     return /* @__PURE__ */ React.createElement(Tag, { key, className: "doc-h" }, renderInline(hm[2], ctx));
   }
-  const isOrdered = lines.every((l) => /^\s*\d+\.\s/.test(l));
-  const isBullet = lines.every((l) => /^\s*[-•]\s/.test(l));
-  if (isOrdered) {
-    return /* @__PURE__ */ React.createElement("ol", { key, style: { margin: "0 0 0.85em", padding: 0, listStyle: "none" } }, lines.map((l, li) => {
-      const mk = ctx.streaming ? /* @__PURE__ */ React.createElement("span", { className: "word", style: { animationDelay: ctx.idx++ * ctx.perWord + "ms" } }, li + 1 + ".") : /* @__PURE__ */ React.createElement("span", null, li + 1 + ".");
-      return /* @__PURE__ */ React.createElement("li", { key: li, style: { display: "flex", gap: "0.55em", marginBottom: 4 } }, mk, /* @__PURE__ */ React.createElement("span", { style: { minWidth: 0 } }, renderInline(l.replace(/^\s*\d+\.\s/, ""), ctx)));
-    }));
-  }
-  if (isBullet) {
-    return /* @__PURE__ */ React.createElement("ul", { key, style: { margin: "0 0 0.85em", padding: 0, listStyle: "none" } }, lines.map((l, li) => {
-      const mk = ctx.streaming ? /* @__PURE__ */ React.createElement("span", { className: "word", style: { animationDelay: ctx.idx++ * ctx.perWord + "ms" } }, "\u2022") : /* @__PURE__ */ React.createElement("span", null, "\u2022");
-      return /* @__PURE__ */ React.createElement("li", { key: li, style: { display: "flex", gap: "0.55em", marginBottom: 4 } }, mk, /* @__PURE__ */ React.createElement("span", { style: { minWidth: 0 } }, renderInline(l.replace(/^\s*[-•]\s/, ""), ctx)));
-    }));
-  }
   const looksTable = lines.length >= 2 && lines.every((l) => l.includes("|")) && /^[\s|:-]+$/.test(lines[1]) && lines[1].includes("-");
   if (looksTable) {
     const toCells = (l) => l.replace(/^\s*\|/, "").replace(/\|\s*$/, "").split("|").map((c) => c.trim());
@@ -319,7 +305,51 @@ function renderProseBlock(block, key, ctx) {
     const rows = lines.slice(2).filter((l) => l.trim()).map(toCells);
     return /* @__PURE__ */ React.createElement("table", { key, className: "md-table" }, /* @__PURE__ */ React.createElement("thead", null, /* @__PURE__ */ React.createElement("tr", null, header.map((c, ci) => /* @__PURE__ */ React.createElement("th", { key: ci }, renderInline(c, ctx))))), /* @__PURE__ */ React.createElement("tbody", null, rows.map((r, ri) => /* @__PURE__ */ React.createElement("tr", { key: ri }, r.map((c, ci) => /* @__PURE__ */ React.createElement("td", { key: ci }, renderInline(c, ctx)))))));
   }
-  return /* @__PURE__ */ React.createElement("p", { key }, lines.map((l, li) => /* @__PURE__ */ React.createElement(React.Fragment, { key: li }, renderInline(l, ctx), li < lines.length - 1 ? /* @__PURE__ */ React.createElement("br", null) : null)));
+  const bulletRe = /^\s*[-•]\s+/;
+  const orderedRe = /^\s*\d+\.\s+/;
+  const out = [];
+  let buf = [];
+  let listKind = null;
+  let items = [];
+  const flushPara = () => {
+    if (!buf.length) return;
+    const ls = buf;
+    buf = [];
+    out.push(/* @__PURE__ */ React.createElement("p", { key: key + "-p" + out.length }, ls.map((l, li) => /* @__PURE__ */ React.createElement(React.Fragment, { key: li }, renderInline(l, ctx), li < ls.length - 1 ? /* @__PURE__ */ React.createElement("br", null) : null))));
+  };
+  const flushList = () => {
+    if (!items.length) return;
+    const its = items;
+    const kind = listKind;
+    items = [];
+    listKind = null;
+    const Tag = kind === "ol" ? "ol" : "ul";
+    out.push(
+      /* @__PURE__ */ React.createElement(Tag, { key: key + "-l" + out.length, style: { margin: "0 0 0.85em", padding: 0, listStyle: "none" } }, its.map((it, li) => {
+        const marker = kind === "ol" ? li + 1 + "." : "\u2022";
+        const mk = ctx.streaming ? /* @__PURE__ */ React.createElement("span", { className: "word", style: { animationDelay: ctx.idx++ * ctx.perWord + "ms" } }, marker) : /* @__PURE__ */ React.createElement("span", null, marker);
+        return /* @__PURE__ */ React.createElement("li", { key: li, style: { display: "flex", gap: "0.55em", marginBottom: 4 } }, mk, /* @__PURE__ */ React.createElement("span", { style: { minWidth: 0 } }, it.map((seg, si) => /* @__PURE__ */ React.createElement(React.Fragment, { key: si }, si ? " " : null, renderInline(seg, ctx)))));
+      }))
+    );
+  };
+  for (const raw of lines) {
+    const isB = bulletRe.test(raw), isO = !isB && orderedRe.test(raw);
+    if (isB || isO) {
+      flushPara();
+      const kind = isO ? "ol" : "ul";
+      if (listKind && listKind !== kind) flushList();
+      listKind = kind;
+      items.push([raw.replace(isO ? orderedRe : bulletRe, "")]);
+    } else if (items.length && raw.trim()) {
+      items[items.length - 1].push(raw.trim());
+    } else {
+      flushList();
+      if (raw.trim() || buf.length) buf.push(raw);
+    }
+  }
+  flushPara();
+  flushList();
+  return /* @__PURE__ */ React.createElement(React.Fragment, { key }, out);
 }
 function formatAssistant(text, streaming) {
   if (!text) return null;

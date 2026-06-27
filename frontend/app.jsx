@@ -283,36 +283,6 @@ function renderProseBlock(block, key, ctx) {
     const Tag = lvl <= 1 ? "h2" : lvl === 2 ? "h3" : "h4";
     return <Tag key={key} className="doc-h">{renderInline(hm[2], ctx)}</Tag>;
   }
-  const isOrdered = lines.every((l) => /^\s*\d+\.\s/.test(l));
-  const isBullet = lines.every((l) => /^\s*[-•]\s/.test(l));
-  if (isOrdered) {
-    return (
-      <ol key={key} style={{ margin: "0 0 0.85em", padding: 0, listStyle: "none" }}>
-        {lines.map((l, li) => {
-          const mk = ctx.streaming
-            ? <span className="word" style={{ animationDelay: ((ctx.idx++) * ctx.perWord) + "ms" }}>{(li + 1) + "."}</span>
-            : <span>{(li + 1) + "."}</span>;
-          return (
-            <li key={li} style={{ display: "flex", gap: "0.55em", marginBottom: 4 }}>{mk}<span style={{ minWidth: 0 }}>{renderInline(l.replace(/^\s*\d+\.\s/, ""), ctx)}</span></li>
-          );
-        })}
-      </ol>
-    );
-  }
-  if (isBullet) {
-    return (
-      <ul key={key} style={{ margin: "0 0 0.85em", padding: 0, listStyle: "none" }}>
-        {lines.map((l, li) => {
-          const mk = ctx.streaming
-            ? <span className="word" style={{ animationDelay: ((ctx.idx++) * ctx.perWord) + "ms" }}>•</span>
-            : <span>•</span>;
-          return (
-            <li key={li} style={{ display: "flex", gap: "0.55em", marginBottom: 4 }}>{mk}<span style={{ minWidth: 0 }}>{renderInline(l.replace(/^\s*[-•]\s/, ""), ctx)}</span></li>
-          );
-        })}
-      </ul>
-    );
-  }
   const looksTable = lines.length >= 2 && lines.every((l) => l.includes("|")) && /^[\s|:-]+$/.test(lines[1]) && lines[1].includes("-");
   if (looksTable) {
     const toCells = (l) => l.replace(/^\s*\|/, "").replace(/\|\s*$/, "").split("|").map((c) => c.trim());
@@ -325,9 +295,58 @@ function renderProseBlock(block, key, ctx) {
       </table>
     );
   }
-  return <p key={key}>{lines.map((l, li) => (
-    <React.Fragment key={li}>{renderInline(l, ctx)}{li < lines.length - 1 ? <br /> : null}</React.Fragment>
-  ))}</p>;
+  // Списки + абзацы вперемешку. Пункт начинается со строки-маркера (-, •, «1.»),
+  // строки без маркера приклеиваются к текущему пункту (поддержка многострочных пунктов).
+  const bulletRe = /^\s*[-•]\s+/;
+  const orderedRe = /^\s*\d+\.\s+/;
+  const out = [];
+  let buf = [];               // строки обычного абзаца
+  let listKind = null;        // 'ul' | 'ol'
+  let items = [];             // пункты текущего списка (каждый — массив сегментов)
+  const flushPara = () => {
+    if (!buf.length) return;
+    const ls = buf; buf = [];
+    out.push(<p key={key + "-p" + out.length}>{ls.map((l, li) => (
+      <React.Fragment key={li}>{renderInline(l, ctx)}{li < ls.length - 1 ? <br /> : null}</React.Fragment>
+    ))}</p>);
+  };
+  const flushList = () => {
+    if (!items.length) return;
+    const its = items; const kind = listKind; items = []; listKind = null;
+    const Tag = kind === "ol" ? "ol" : "ul";
+    out.push(
+      <Tag key={key + "-l" + out.length} style={{ margin: "0 0 0.85em", padding: 0, listStyle: "none" }}>
+        {its.map((it, li) => {
+          const marker = kind === "ol" ? (li + 1) + "." : "•";
+          const mk = ctx.streaming
+            ? <span className="word" style={{ animationDelay: ((ctx.idx++) * ctx.perWord) + "ms" }}>{marker}</span>
+            : <span>{marker}</span>;
+          return (
+            <li key={li} style={{ display: "flex", gap: "0.55em", marginBottom: 4 }}>{mk}<span style={{ minWidth: 0 }}>{it.map((seg, si) => (
+              <React.Fragment key={si}>{si ? " " : null}{renderInline(seg, ctx)}</React.Fragment>
+            ))}</span></li>
+          );
+        })}
+      </Tag>
+    );
+  };
+  for (const raw of lines) {
+    const isB = bulletRe.test(raw), isO = !isB && orderedRe.test(raw);
+    if (isB || isO) {
+      flushPara();
+      const kind = isO ? "ol" : "ul";
+      if (listKind && listKind !== kind) flushList();
+      listKind = kind;
+      items.push([raw.replace(isO ? orderedRe : bulletRe, "")]);
+    } else if (items.length && raw.trim()) {
+      items[items.length - 1].push(raw.trim());   // продолжение пункта
+    } else {
+      flushList();
+      if (raw.trim() || buf.length) buf.push(raw);
+    }
+  }
+  flushPara(); flushList();
+  return <React.Fragment key={key}>{out}</React.Fragment>;
 }
 
 function formatAssistant(text, streaming) {

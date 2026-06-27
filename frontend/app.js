@@ -751,7 +751,6 @@ function App() {
   }
   const lastTurnMinHeight = Math.max(280, scrollH - 16 - 190);
   return /* @__PURE__ */ React.createElement("div", { className: "app" }, /* @__PURE__ */ React.createElement("header", { className: "hdr" }, /* @__PURE__ */ React.createElement("div", { className: "hdr-l" }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { className: "hdr-title" }, t.agentName))), /* @__PURE__ */ React.createElement("div", { className: "hdr-r" }, /* @__PURE__ */ React.createElement("button", { className: "ghost-btn", "aria-label": "\u041E\u0447\u0438\u0441\u0442\u0438\u0442\u044C \u0447\u0430\u0442", title: "\u041E\u0447\u0438\u0441\u0442\u0438\u0442\u044C \u0447\u0430\u0442", onClick: () => {
-    if (!window.confirm("\u041E\u0447\u0438\u0441\u0442\u0438\u0442\u044C \u0432\u0435\u0441\u044C \u0447\u0430\u0442? \u041D\u0430\u043E\u043C\u0438 \u043F\u043E\u043B\u043D\u043E\u0441\u0442\u044C\u044E \u0437\u0430\u0431\u0443\u0434\u0435\u0442 \u0440\u0430\u0437\u0433\u043E\u0432\u043E\u0440.")) return;
     fetch("/api/reset", { method: "POST" }).catch(() => {
     });
     setMessages([]);

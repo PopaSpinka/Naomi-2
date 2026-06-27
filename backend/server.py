@@ -150,6 +150,14 @@ async def history():
     return {"messages": CONVO}
 
 
+@app.post("/api/reset")
+async def reset():
+    """Полностью очищает общий тред (веб + контекст для телеграма) — Наоми забывает разговор."""
+    async with _convo_lock:
+        CONVO.clear()   # очистка на месте: телеграм-поллер держит ссылку на этот же список
+    return {"ok": True}
+
+
 @app.get("/api/settings")
 async def get_settings():
     return load_settings()

@@ -36,7 +36,7 @@ SETTINGS_FILE = os.path.join(DATA, "settings.json")
 SESSION_FILE = os.path.join(DATA, "session.json")
 
 DEFAULT_SETTINGS = {"model": "gpt-5.5", "reasoning": "low"}
-VERSION = "naomi-0.9.1"
+VERSION = "naomi-0.9.2"
 
 app = FastAPI()
 
@@ -283,7 +283,7 @@ async def _start_telegram():
     # если телеграм настроен (data/telegram.json) — поднимаем мост в фоне
     global _tg_task
     if telegram.is_configured():
-        _tg_task = asyncio.create_task(telegram.run(build_instructions, load_settings, CONVO, _convo_lock, sse_publish))
+        _tg_task = asyncio.create_task(telegram.run(build_instructions, load_settings, CONVO, _convo_lock, sse_publish, cache_key))
 
 
 @app.on_event("shutdown")

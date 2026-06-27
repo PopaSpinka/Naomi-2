@@ -90,11 +90,12 @@ async def _send(client, token, chat_id, text):
             await _api(client, token, "sendMessage", chat_id=chat_id, text=chunk[:MSG_LIMIT])
 
 
-async def run(get_instructions, get_settings, convo, lock, publish):
+async def run(get_instructions, get_settings, convo, lock, publish, get_cache_key=None):
     """Запускается из server.py на старте.
 
     convo  — общий тред (список) веба и телеграма; lock — сериализует ход;
-    publish(event) — отправляет событие в веб через SSE (зеркало телеграма в веб).
+    publish(event) — отправляет событие в веб через SSE (зеркало телеграма в веб);
+    get_cache_key() — тот же стабильный prompt_cache_key, что у веба → общий тёплый кеш.
     """
     cfg = load_cfg()
     if not cfg or not cfg.get("token"):
@@ -150,6 +151,7 @@ async def run(get_instructions, get_settings, convo, lock, publish):
                                 effort=s.get("reasoning", "low"),
                                 search_fn=search.search if search.is_configured() else None,
                                 context_note=home.build_context_note(),   # время + состояние дома
+                                cache_key=get_cache_key() if get_cache_key else None,  # общий кеш с вебом
                             )
                             stats.record(result.get("usage"))   # токены телеграма — в общий счёт сессии
                             reply = (result.get("text") or "").strip() or "…"

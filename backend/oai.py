@@ -253,14 +253,15 @@ async def _stream_once(client, session_id, body, tok_holder, auth_path):
 
 
 def _context_item(note: str) -> dict:
-    """Эфемерный блок «реально сейчас» (время + дом). Кладём ПЕРЕД последней репликой
-    юзера, помечая, что это не его слова. В историю (CONVO) не сохраняется."""
+    """Эфемерный блок «реально сейчас» (время + дом). Кладём В КОНЕЦ запроса (после
+    реплики юзера) — так весь префикс кешируется. Помечаем, что это не его слова.
+    В историю (CONVO) не сохраняется."""
     return {
         "type": "message",
         "role": "user",
         "content": [{"type": "input_text",
-                     "text": "[Контекст · реальное состояние прямо сейчас, обновляется само; "
-                             "не реплика собеседника — просто знай и опирайся]\n" + note}],
+                     "text": "[Контекст · реальные время и состояние дома прямо сейчас, обновляется "
+                             "само; не реплика собеседника — учитывай при ответе на его сообщение выше]\n" + note}],
     }
 
 
@@ -271,14 +272,15 @@ async def stream_chat(messages, *, instructions, model="gpt-5.5", effort="low",
 
     Если передан search_fn — у модели появляется инструмент web_search: она сама решает,
     когда искать, формулирует английский запрос, мы зовём search_fn(query) и возвращаем ей результат.
-    context_note (если есть) — эфемерный блок состояния, вставляется перед последней репликой юзера."""
+    context_note (если есть) — эфемерный блок состояния, добавляется В КОНЕЦ запроса
+    (волатильное — последним: префикс с персоной и историей остаётся стабильным и кешируется,
+    некешируется только сам блок ~110 токенов)."""
     tok_holder = {"tokens": await _fresh_tokens(auth_path)}
     session_id = str(uuid.uuid4())
     cache_key = cache_key or session_id
     input_items = _to_input(messages)
     if context_note:
-        note = _context_item(context_note)
-        input_items = (input_items[:-1] + [note] + input_items[-1:]) if input_items else [note]
+        input_items = input_items + [_context_item(context_note)]
     tools = [WEB_SEARCH_TOOL] if search_fn else []
     usage = {}
 

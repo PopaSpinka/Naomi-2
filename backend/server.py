@@ -13,6 +13,7 @@ from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
 import auth
+import home
 import oai
 import search
 import telegram
@@ -30,7 +31,7 @@ SETTINGS_FILE = os.path.join(DATA, "settings.json")
 SESSION_FILE = os.path.join(DATA, "session.json")
 
 DEFAULT_SETTINGS = {"model": "gpt-5.5", "reasoning": "low"}
-VERSION = "naomi-0.6.0"
+VERSION = "naomi-0.7.0"
 
 app = FastAPI()
 
@@ -128,6 +129,7 @@ async def chat(req: Request):
                     effort=cfg.get("reasoning", "low"),
                     cache_key=cache_key(),
                     search_fn=sfn,
+                    context_note=home.build_context_note(),   # эфемерно: время + состояние дома
                 ):
                     if kind == "delta" and part:
                         full += part
@@ -179,6 +181,22 @@ async def tavily_save(req: Request):
         return JSONResponse({"error": "bad json"}, status_code=400)
     search.save_key((body.get("key") or "").strip())
     return search.status()
+
+
+@app.get("/api/home")
+async def get_home():
+    """Состояние «умного дома» для панели (датчики/кнопки)."""
+    return home.state()
+
+
+@app.post("/api/home")
+async def set_home(req: Request):
+    """Патч состояния дома (Слава кликает в панели). Наоми увидит на следующем сообщении."""
+    try:
+        body = await req.json()
+    except Exception:
+        return JSONResponse({"error": "bad json"}, status_code=400)
+    return home.update(body)
 
 
 @app.get("/api/settings")

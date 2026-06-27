@@ -550,6 +550,114 @@ function setDel(setter, id) {
 
 
 
+// ── Панель «умный дом» (датчики/кнопки; состояние задаёт Слава, Наоми видит сразу) ──
+const HP_ROOMS = [{ v: "гостиная", label: "гостиная" }, { v: "кухня", label: "кухня" }, { v: "спальня", label: "спальня" }];
+const HP_AC_MODES = [{ v: "cool", label: "охлаждение" }, { v: "heat", label: "обогрев" }, { v: "fan", label: "вентиляция" }, { v: "dry", label: "осушение" }, { v: "auto", label: "авто" }];
+const HP_FANS = [{ v: "auto", label: "авто" }, { v: "low", label: "низ" }, { v: "mid", label: "сред" }, { v: "high", label: "выс" }];
+const HP_CONDS = [{ v: "ясно", label: "☀ ясно" }, { v: "облачно", label: "⛅ облачно" }, { v: "пасмурно", label: "☁ пасмурно" }, { v: "дождь", label: "🌧 дождь" }, { v: "гроза", label: "⛈ гроза" }, { v: "снег", label: "❄ снег" }, { v: "туман", label: "🌫 туман" }];
+const HP_VAC = [{ v: "vacuum", label: "пылесосит" }, { v: "mop", label: "моет" }];
+const cap = (s) => (s ? s[0].toUpperCase() + s.slice(1) : s);
+
+function HSeg({ value, options, onPick }) {
+  return (
+    <span className="home-seg">
+      {options.map((o) => (
+        <button key={o.v} className={value === o.v ? "on" : ""} onClick={() => onPick(o.v)}>{o.label}</button>
+      ))}
+    </span>
+  );
+}
+function HStep({ value, onSet, min, max, suffix }) {
+  const set = (d) => onSet(Math.max(min, Math.min(max, value + d)));
+  return (
+    <span className="home-step">
+      <button onClick={() => set(-1)} aria-label="меньше">−</button>
+      <b>{value}{suffix}</b>
+      <button onClick={() => set(1)} aria-label="больше">+</button>
+    </span>
+  );
+}
+function HCycle({ value, options, onPick }) {
+  const i = Math.max(0, options.findIndex((o) => o.v === value));
+  return <button className="home-cycle" onClick={() => onPick(options[(i + 1) % options.length].v)}>{(options[i] || options[0]).label}</button>;
+}
+function HRow({ label, children }) {
+  return <div className="home-row"><span className="home-row-l">{label}</span><span className="home-row-c">{children}</span></div>;
+}
+
+function HomePanel({ open, home, onPatch, onClose }) {
+  const h = home || {};
+  const people = h.people || {}, ac = h.ac || {}, weather = h.weather || {}, indoor = h.indoor || {}, vac = h.vacuum || {}, toilet = h.toilet || {};
+  return (
+    <aside className={"home-panel" + (open ? " open" : "")} aria-hidden={!open}>
+      <div className="home-head"><span>🏠 Умный дом</span><button className="home-x" onClick={onClose} aria-label="Закрыть">✕</button></div>
+      <div className="home-body">
+
+        <div className="home-sec">
+          <div className="home-sec-h">Люди</div>
+          {Object.keys(people).map((name) => {
+            const p = people[name] || {};
+            return (
+              <div className="home-person" key={name}>
+                <HRow label={name}>
+                  <HSeg value={p.home ? "y" : "n"} options={[{ v: "y", label: "дома" }, { v: "n", label: "не дома" }]} onPick={(v) => onPatch({ people: { [name]: { home: v === "y" } } })} />
+                </HRow>
+                {p.home ? <div className="home-rooms"><HSeg value={p.room} options={HP_ROOMS} onPick={(v) => onPatch({ people: { [name]: { room: v } } })} /></div> : null}
+              </div>
+            );
+          })}
+        </div>
+
+        <div className="home-sec">
+          <div className="home-sec-h"><span>Кондиционер</span><HSeg value={ac.on ? "y" : "n"} options={[{ v: "y", label: "вкл" }, { v: "n", label: "выкл" }]} onPick={(v) => onPatch({ ac: { on: v === "y" } })} /></div>
+          {ac.on ? (
+            <React.Fragment>
+              <HRow label="Температура"><HStep value={ac.temp ?? 22} suffix="°" min={16} max={30} onSet={(v) => onPatch({ ac: { temp: v } })} /></HRow>
+              <HRow label="Режим"><HCycle value={ac.mode} options={HP_AC_MODES} onPick={(v) => onPatch({ ac: { mode: v } })} /></HRow>
+              <HRow label="Вентилятор"><HSeg value={ac.fan} options={HP_FANS} onPick={(v) => onPatch({ ac: { fan: v } })} /></HRow>
+            </React.Fragment>
+          ) : null}
+        </div>
+
+        <div className="home-sec">
+          <div className="home-sec-h">Туалет</div>
+          <HRow label="Статус"><HSeg value={toilet.occupied ? "y" : "n"} options={[{ v: "y", label: "занят" }, { v: "n", label: "свободен" }]} onPick={(v) => onPatch({ toilet: { occupied: v === "y" } })} /></HRow>
+        </div>
+
+        <div className="home-sec">
+          <div className="home-sec-h">За окном</div>
+          <HRow label="Температура"><HStep value={weather.temp ?? 0} suffix="°" min={-40} max={50} onSet={(v) => onPatch({ weather: { temp: v } })} /></HRow>
+          <HRow label="Небо"><HCycle value={weather.condition} options={HP_CONDS} onPick={(v) => onPatch({ weather: { condition: v } })} /></HRow>
+          <HRow label="Ветер"><HStep value={weather.wind ?? 0} suffix=" м/с" min={0} max={40} onSet={(v) => onPatch({ weather: { wind: v } })} /></HRow>
+        </div>
+
+        <div className="home-sec">
+          <div className="home-sec-h">Температура в доме</div>
+          {["спальня", "гостиная", "кухня"].map((room) => (
+            <HRow key={room} label={cap(room)}><HStep value={indoor[room] ?? 22} suffix="°" min={10} max={35} onSet={(v) => onPatch({ indoor: { [room]: v } })} /></HRow>
+          ))}
+        </div>
+
+        <div className="home-sec">
+          <div className="home-sec-h"><span>Робот-пылесос</span><HSeg value={vac.on ? "y" : "n"} options={[{ v: "y", label: "работает" }, { v: "n", label: "спит" }]} onPick={(v) => onPatch({ vacuum: { on: v === "y" } })} /></div>
+          {vac.on ? <HRow label="Режим"><HSeg value={vac.mode} options={HP_VAC} onPick={(v) => onPatch({ vacuum: { mode: v } })} /></HRow> : null}
+        </div>
+
+      </div>
+    </aside>
+  );
+}
+
+function deepMerge(base, over) {
+  const out = Array.isArray(base) ? base.slice() : { ...(base || {}) };
+  for (const k in (over || {})) {
+    const v = over[k];
+    out[k] = (v && typeof v === "object" && !Array.isArray(v) && out[k] && typeof out[k] === "object")
+      ? deepMerge(out[k], v) : v;
+  }
+  return out;
+}
+
 function App() {
   const [t, setTweak] = useTweaks(TWEAK_DEFAULTS);
   const [messages, setMessages] = useState(INITIAL_MESSAGES);
@@ -573,6 +681,16 @@ function App() {
     setTavilyBusy(true);
     fetch("/api/services/tavily", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ key: tavilyKey.trim() }) })
       .then((r) => r.json()).then((s) => { setTavily(s); setTavilyKey(""); }).catch(() => {}).finally(() => setTavilyBusy(false));
+  };
+  // Умный дом (панель датчиков справа от чата). Слава задаёт состояние кликами —
+  // оптимистично меняем локально и шлём патч на бэкенд; Наоми видит на следующем сообщении.
+  const [homeOpen, setHomeOpen] = useState(false);
+  const [home, setHome] = useState(null);
+  const loadHome = () => fetch("/api/home").then((r) => r.json()).then(setHome).catch(() => {});
+  const patchHome = (patch) => {
+    setHome((prev) => deepMerge(prev || {}, patch));
+    fetch("/api/home", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(patch) })
+      .then((r) => r.json()).then(setHome).catch(() => {});
   };
   // Документация (вкладка «Документация»): markdown из DOCUMENTATION.md.
   const [docs, setDocs] = useState("");
@@ -600,7 +718,7 @@ function App() {
   const loadSettings = () => fetch("/api/settings").then((r) => r.json()).then((d) => setAgentCfg((c) => Object.assign({}, c, d))).catch(() => {});
   // Подтягиваем сохранённые настройки сразу при загрузке — чтобы видимость облачек
   // задач (showTaskChips) и прочее отражали сервер, а не только после открытия настроек.
-  useEffect(() => { loadSettings(); loadAuth(); }, []);
+  useEffect(() => { loadSettings(); loadAuth(); loadHome(); }, []);
   // Esc закрывает модалку настроек (раньше — только клик по фону/✕, rank 17).
   useEffect(() => {
     if (!settingsOpen) return;
@@ -832,7 +950,7 @@ function App() {
           </div>
         </div>
         <div className="hdr-r">
-          
+          <button className={"ghost-btn" + (homeOpen ? " is-on" : "")} aria-label="Умный дом" title="Умный дом" onClick={() => { setHomeOpen((v) => !v); loadHome(); }}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M3 10.5L12 3l9 7.5"></path><path d="M5 9.5V20a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V9.5"></path><path d="M9.5 21v-6h5v6"></path></svg></button>
           <button className="ghost-btn" aria-label="Очистить чат" title="Очистить чат" onClick={() => { fetch("/api/reset", { method: "POST" }).catch(() => {}); setMessages([]); setBusyTurns(new Set()); setFadingTurns(new Set()); setInstantTurns(new Set()); }}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"></path><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg></button>
           <button className="ghost-btn" aria-label="Settings" title="Settings" onClick={() => { setSettingsOpen(true); loadSettings(); }}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg></button>
         </div>
@@ -862,6 +980,8 @@ function App() {
       <Composer onSend={handleSend} disabled={thinking} />
 
       {version ? <div className="version-badge" title="Текущая версия (git HEAD)">{version}</div> : null}
+
+      <HomePanel open={homeOpen} home={home} onPatch={patchHome} onClose={() => setHomeOpen(false)} />
 
       <TweaksPanel title="Tweaks">
         <TweakSection label="Внешний вид" />

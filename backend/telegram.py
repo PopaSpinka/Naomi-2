@@ -9,6 +9,7 @@ import os
 
 import httpx
 
+import home
 import oai
 import search
 
@@ -147,6 +148,7 @@ async def run(get_instructions, get_settings, convo, lock, publish):
                                 model=s.get("model", "gpt-5.5"),
                                 effort=s.get("reasoning", "low"),
                                 search_fn=search.search if search.is_configured() else None,
+                                context_note=home.build_context_note(),   # время + состояние дома
                             )
                             reply = (result.get("text") or "").strip() or "…"
                         except Exception:

@@ -245,16 +245,33 @@ async def _stream_once(client, session_id, body, tok_holder, auth_path):
             yield ev
 
 
+def _context_item(note: str) -> dict:
+    """Эфемерный блок «реально сейчас» (время + дом). Кладём ПЕРЕД последней репликой
+    юзера, помечая, что это не его слова. В историю (CONVO) не сохраняется."""
+    return {
+        "type": "message",
+        "role": "user",
+        "content": [{"type": "input_text",
+                     "text": "[Контекст · реальное состояние прямо сейчас, обновляется само; "
+                             "не реплика собеседника — просто знай и опирайся]\n" + note}],
+    }
+
+
 async def stream_chat(messages, *, instructions, model="gpt-5.5", effort="low",
-                      verbosity="medium", cache_key=None, auth_path=AUTH_PATH, search_fn=None):
+                      verbosity="medium", cache_key=None, auth_path=AUTH_PATH, search_fn=None,
+                      context_note=None):
     """Стримит ответ Наоми. Yield'ит ('delta', text), ('tool', {query}) при поиске, в конце ('done', usage).
 
     Если передан search_fn — у модели появляется инструмент web_search: она сама решает,
-    когда искать, формулирует английский запрос, мы зовём search_fn(query) и возвращаем ей результат."""
+    когда искать, формулирует английский запрос, мы зовём search_fn(query) и возвращаем ей результат.
+    context_note (если есть) — эфемерный блок состояния, вставляется перед последней репликой юзера."""
     tok_holder = {"tokens": await _fresh_tokens(auth_path)}
     session_id = str(uuid.uuid4())
     cache_key = cache_key or session_id
     input_items = _to_input(messages)
+    if context_note:
+        note = _context_item(context_note)
+        input_items = (input_items[:-1] + [note] + input_items[-1:]) if input_items else [note]
     tools = [WEB_SEARCH_TOOL] if search_fn else []
     usage = {}
 
@@ -293,12 +310,14 @@ async def stream_chat(messages, *, instructions, model="gpt-5.5", effort="low",
 
 
 async def complete(messages, *, instructions, model="gpt-5.5", effort="low",
-                   verbosity="medium", cache_key=None, auth_path=AUTH_PATH, search_fn=None) -> dict:
+                   verbosity="medium", cache_key=None, auth_path=AUTH_PATH, search_fn=None,
+                   context_note=None) -> dict:
     """Нестриминговый помощник: собирает полный текст ответа и usage (поиск прозрачен)."""
     text, usage = "", {}
     async for kind, payload in stream_chat(messages, instructions=instructions, model=model,
                                            effort=effort, verbosity=verbosity,
-                                           cache_key=cache_key, auth_path=auth_path, search_fn=search_fn):
+                                           cache_key=cache_key, auth_path=auth_path, search_fn=search_fn,
+                                           context_note=context_note):
         if kind == "delta":
             text += payload
         elif kind == "done":

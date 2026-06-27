@@ -6,11 +6,15 @@
 import asyncio
 import json
 import os
+import sys
 import uuid
 
 from fastapi import FastAPI, Request
 from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
+
+# Слой «умный дом» (home/) лежит в КОРНЕ проекта, отдельно от backend — добавим корень в путь.
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import auth
 import home
@@ -31,7 +35,7 @@ SETTINGS_FILE = os.path.join(DATA, "settings.json")
 SESSION_FILE = os.path.join(DATA, "session.json")
 
 DEFAULT_SETTINGS = {"model": "gpt-5.5", "reasoning": "low"}
-VERSION = "naomi-0.7.1"
+VERSION = "naomi-0.8.0"
 
 app = FastAPI()
 
@@ -57,7 +61,8 @@ def load_settings():
 
 
 def build_instructions() -> str:
-    """Личность Наоми = naomi.md + pravila.md. Читаем каждый раз — правки сразу в деле."""
+    """Личность Наоми = ядро (naomi.md + pravila.md) + слой дома (home.persona()).
+    Читаем каждый раз — правки в файлах/модулях сразу в деле."""
     parts = []
     for p in (NAOMI_MD, PRAVILA_MD):
         try:
@@ -67,6 +72,9 @@ def build_instructions() -> str:
                     parts.append(t)
         except Exception:
             pass
+    hp = home.persona()   # «у тебя есть дом…» + персональные куски модулей
+    if hp:
+        parts.append(hp)
     return "\n\n".join(parts) if parts else "Тебя зовут Наоми."
 
 

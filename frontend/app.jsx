@@ -692,9 +692,6 @@ function App() {
     fetch("/api/home", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(patch) })
       .then((r) => r.json()).then(setHome).catch(() => {});
   };
-  // Документация (вкладка «Документация»): markdown из DOCUMENTATION.md.
-  const [docs, setDocs] = useState("");
-  const loadDocs = () => fetch("/api/docs").then((r) => r.json()).then((d) => setDocs(d.markdown || "")).catch(() => {});
   const startLogin = () => {
     setAuthBusy(true);
     fetch("/api/auth/login", { method: "POST" }).then((r) => r.json()).then((d) => {
@@ -1005,7 +1002,6 @@ function App() {
               <div className="set-side">
                 <button className={"set-nav" + (settingsTab === "agent" ? " active" : "")} onClick={() => setSettingsTab("agent")}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg><span>{L("nav.agent")}</span></button>
                 <button className={"set-nav" + (settingsTab === "account" ? " active" : "")} onClick={() => { setSettingsTab("account"); loadAuth(); loadTavily(); }}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zM15.5 7.5l3 3L22 7l-3-3-3.5 3.5z"></path></svg><span>{L("nav.account")}</span></button>
-                <button className={"set-nav" + (settingsTab === "docs" ? " active" : "")} onClick={() => { setSettingsTab("docs"); loadDocs(); }}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg><span>{L("nav.docs")}</span></button>
                 <button className={"set-nav" + (settingsTab === "about" ? " active" : "")} style={{ marginTop: "auto" }} onClick={() => setSettingsTab("about")}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg><span>{L("nav.about")}</span></button>
               </div>
               <div className="set-main">
@@ -1073,15 +1069,6 @@ function App() {
                         <a href="https://app.tavily.com" target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, color: "#4a9eff", textDecoration: "none" }}>{L("account.tavilyGetKey")}</a>
                       </div>
                     </div>
-                  </React.Fragment>
-                ) : settingsTab === "docs" ? (
-                  <React.Fragment>
-                    <h2 className="set-h">{L("nav.docs")}</h2>
-                    {docs ? (
-                      <div className="doc-body">{formatAssistant(docs, false).content}</div>
-                    ) : (
-                      <p className="set-rd">{L("docs.loading")}</p>
-                    )}
                   </React.Fragment>
                 ) : settingsTab === "about" ? (
                   <React.Fragment>
